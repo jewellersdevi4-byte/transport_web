@@ -23,7 +23,6 @@ import {
   Smartphone,
   X,
   Phone,
-  Database,
   RefreshCw,
   FileText,
   Navigation,
@@ -78,8 +77,7 @@ export default function AdminApp() {
           <p className="eyebrow">CENTRAL OPERATIONS PORTAL</p>
           <h1>Real-time fleet.<br />Every mile in control.</h1>
           <p>
-            Connected directly to PostgreSQL database.<br />
-            Monitor bookings, dispatch chauffeurs, track trip transitions, and manage collections.
+            Central operations management console. Dispatch verified chauffeurs, monitor journeys in real time, and oversee fleet readiness.
           </p>
         </div>
         <Auth admin onLogin={session.login} />
@@ -114,11 +112,11 @@ export default function AdminApp() {
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-mark">
-            <span className="db-badge" style={{ marginBottom: 6 }}>
-              <span className="db-dot" /> PostgreSQL Connected
+            <span className="badge" style={{ background: '#ecfdf5', color: '#065f46', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} /> System Active
             </span>
-            <strong>transport_db</strong>
-            <small>Port 5432 · Advisory locking</small>
+            <strong>Bengaluru Dispatch Hub</strong>
+            <small>Fleet & Operations Center</small>
           </div>
           <button onClick={session.logout}>
             <LogOut size={16} /> Sign out
@@ -136,8 +134,8 @@ export default function AdminApp() {
           </span>
 
           <div className="header-right">
-            <span className="db-badge">
-              <span className="db-dot" /> PostgreSQL Active
+            <span className="badge" style={{ background: '#ecfdf5', color: '#065f46', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} /> Live Operations
             </span>
             <button className="icon-button" aria-label="Notifications" onClick={() => setPage('Notifications')}>
               <Bell size={18} />
@@ -280,7 +278,7 @@ function Dashboard({
         <Stat
           title="Today's bookings"
           value={d.bookings.filter((b) => b.date === today).length}
-          sub={`${d.bookings.length} total database records`}
+          sub={`${d.bookings.length} total bookings recorded`}
         />
         <Stat
           title="Pending dispatch"
@@ -402,7 +400,7 @@ function Dashboard({
 
       <section className="card panel">
         <div className="section-title">
-          <h2>Recent Bookings (PostgreSQL)</h2>
+          <h2>Recent Bookings</h2>
           <button className="text-button" onClick={goBookings}>
             View all bookings <ArrowRight size={16} />
           </button>
@@ -509,7 +507,7 @@ function Bookings({ token, open }: { token: string; open: (id: string) => void }
     <>
       <Heading
         title="Fleet Bookings Registry"
-        description="Filter, inspect, and dispatch trips with direct relational database consistency."
+        description="Filter, inspect, and dispatch trips with real-time operations overview."
       />
       <section className="card panel">
         <div className="filters">
@@ -586,6 +584,24 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
   const [message, setMessage] = useState('');
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [waModal, setWaModal] = useState<{
+    driverName?: string;
+    driverPhone?: string;
+    vehicleModel?: string;
+    vehicleNumber?: string;
+    message?: string;
+    link?: string;
+    waUrl?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (r.data?.status === 'DRIVER_ASSIGNED' || r.data?.status === 'TRIP_STARTED') {
+      const interval = setInterval(() => {
+        r.reload();
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [r.data?.status]);
 
   async function action(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST') {
     setBusy(true);
@@ -750,7 +766,7 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
 
                 <div style={{ borderTop: '1px solid #bbf7d0', marginTop: 12, paddingTop: 10 }}>
                   <small style={{ color: '#15803d', display: 'block', marginBottom: 6 }}>
-                    Direct dispatch simulation:
+                    Manual Dispatch Action:
                   </small>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
@@ -861,17 +877,143 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
           <button
             className="primary full"
             disabled={!selected || busy}
-            onClick={() => action(`/admin/bookings/${id}/assign-driver`, { driverId: selected })}
+            onClick={async () => {
+              setBusy(true);
+              setError('');
+              try {
+                const res = await api<{
+                  whatsapp?: {
+                    driverName: string;
+                    driverPhone: string;
+                    vehicleModel: string;
+                    vehicleNumber: string;
+                    message: string;
+                    link: string;
+                    waUrl: string;
+                  };
+                }>(`/admin/bookings/${id}/assign-driver`, {
+                  token,
+                  method: 'POST',
+                  body: { driverId: selected },
+                });
+                setAssign(false);
+                r.reload();
+                if (res?.whatsapp) {
+                  if (typeof window !== 'undefined' && res.whatsapp.waUrl) {
+                    window.open(res.whatsapp.waUrl, '_blank');
+                  }
+                  setWaModal(res.whatsapp);
+                }
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
             style={{ marginTop: 16 }}
           >
-            {busy ? 'Assigning…' : 'Confirm Chauffeur Assignment'}
+            {busy ? 'Assigning & Dispatching…' : 'Confirm Chauffeur Assignment'}
           </button>
+        </Modal>
+      )}
+
+      {waModal && (
+        <Modal title="Trip Offer Dispatched to Chauffeur" onClose={() => setWaModal(null)}>
+          <div style={{ textAlign: 'center', marginBottom: 16 }}>
+            <div style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              background: '#dcfce7',
+              color: '#16a34a',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 10,
+            }}>
+              <Share2 size={26} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: 17, color: '#14532d' }}>Trip Offer Sent via WhatsApp</h3>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#166534' }}>
+              Offered to <strong>{waModal.driverName || 'Chauffeur'}</strong> ({waModal.driverPhone || ''})
+            </p>
+          </div>
+
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 14,
+            fontSize: 12,
+            whiteSpace: 'pre-wrap',
+            fontFamily: 'monospace',
+            color: '#334155',
+            maxHeight: 180,
+            overflowY: 'auto'
+          }}>
+            {waModal.message}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {waModal.waUrl && (
+              <a
+                href={waModal.waUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="primary full"
+                style={{ background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none' }}
+              >
+                <Share2 size={16} /> Open in WhatsApp Chat (wa.me)
+              </a>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              {waModal.link && (
+                <button
+                  type="button"
+                  className="secondary small"
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  onClick={() => {
+                    if (typeof navigator !== 'undefined') {
+                      navigator.clipboard.writeText(waModal.link || '');
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }
+                  }}
+                >
+                  <Copy size={14} /> {copied ? 'Link Copied!' : 'Copy Trip Link'}
+                </button>
+              )}
+
+              {waModal.message && (
+                <button
+                  type="button"
+                  className="secondary small"
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  onClick={() => {
+                    if (typeof navigator !== 'undefined') {
+                      navigator.clipboard.writeText(waModal.message || '');
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }
+                  }}
+                >
+                  <Copy size={14} /> Copy Full Message
+                </button>
+              )}
+            </div>
+
+            <button className="text-button" onClick={() => setWaModal(null)} style={{ marginTop: 4 }}>
+              Done / Return to Booking
+            </button>
+          </div>
         </Modal>
       )}
 
       {confirm && (
         <Modal title={`Confirm status change to ${label(confirm)}?`} onClose={() => setConfirm('')}>
-          <p>This action will persist directly to the PostgreSQL database and dispatch a customer notification.</p>
+          <p>This action will update the booking status and notify the customer.</p>
           {error && <ErrorBox message={error} />}
           <div className="actions">
             <button className="secondary" onClick={() => setConfirm('')}>
@@ -1086,7 +1228,7 @@ function Fleet({ token, kind }: { token: string; kind: 'Drivers' | 'Vehicles' })
               ))}
             </div>
             <button disabled={busy} className="primary" style={{ marginTop: 16 }}>
-              {busy ? 'Saving to Database…' : 'Save Changes'}
+              {busy ? 'Saving Changes…' : 'Save Changes'}
             </button>
           </form>
         </Modal>
@@ -1123,7 +1265,7 @@ function PricingPage({ token }: { token: string }) {
           setBusy(true);
           try {
             await api('/admin/pricing', { token, method: 'PUT', body: pricing });
-            setMessage('Pricing rates saved to database.');
+            setMessage('Pricing rates saved successfully.');
             setError('');
           } catch (e) {
             setError((e as Error).message);
@@ -1236,7 +1378,7 @@ function PricingPage({ token }: { token: string }) {
             </label>
             {error && <ErrorBox message={error} />}
             <button className="primary" disabled={busy}>
-              Save Route to Database
+              Save Route Configuration
             </button>
           </form>
         </Modal>
@@ -1295,7 +1437,7 @@ function Reports({ token }: { token: string }) {
         description="Booking volume, payment settlement, and driver earnings."
         action={
           <button className="secondary" onClick={exportCsv}>
-            <Download size={16} /> Export Database Records (CSV)
+            <Download size={16} /> Export Operations Records (CSV)
           </button>
         }
       />
@@ -1574,7 +1716,7 @@ function SettingsPage({ token }: { token: string }) {
         }}
       >
         {error && <ErrorBox message={error} />}
-        {saved && <p className="notice">Settings saved to PostgreSQL database.</p>}
+        {saved && <p className="notice">Settings saved successfully.</p>}
         <div className="form-grid">
           {(
             ['businessName', 'phone', 'email', 'address', 'cancellationHours', 'apkUrl', 'apkVersion', 'apkSize'] as const
@@ -1613,16 +1755,18 @@ function SettingsPage({ token }: { token: string }) {
       </form>
 
       <section className="card panel">
-        <h2>Provider Integrations (Environment Verified)</h2>
+        <h2>System & Provider Status</h2>
         {Object.entries(r.data?.providers || {}).map(([k, v]) => (
           <div className="report-row" key={k}>
             <strong>{label(k)}</strong>
-            <span className="badge" style={{ background: '#f1f5f9', color: '#334155' }}>{v}</span>
+            <span className="badge" style={{ background: '#ecfdf5', color: '#065f46' }}>{v}</span>
           </div>
         ))}
         <div className="report-row">
-          <strong>Database</strong>
-          <span className="db-badge"><span className="db-dot" /> PostgreSQL 16 (transport_db)</span>
+          <strong>Core Dispatch Engine</strong>
+          <span className="badge" style={{ background: '#ecfdf5', color: '#065f46', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} /> Operational & Active
+          </span>
         </div>
       </section>
     </>

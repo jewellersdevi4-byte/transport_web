@@ -190,6 +190,7 @@ export default function CustomerApp() {
                 <BookingWizard
                   token={session.token}
                   onLogin={() => setAuth(true)}
+                  onLoginToken={session.login}
                   routes={config.data?.routes || []}
                   onBooked={(b) => {
                     setSelectedId(b.id);
@@ -393,11 +394,13 @@ export default function CustomerApp() {
 function BookingWizard({
   token,
   onLogin,
+  onLoginToken,
   routes,
   onBooked,
 }: {
   token: string;
   onLogin: () => void;
+  onLoginToken: (token: string) => void;
   routes: Route[];
   onBooked: (b: Booking) => void;
 }) {
@@ -426,6 +429,19 @@ function BookingWizard({
     requests: '',
     paymentMethod: 'CASH' as const,
   });
+  const [otpModal, setOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [otpHint, setOtpHint] = useState('');
+
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown((n) => n - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCountdown]);
   const [distance, setDistance] = useState<number | null>(null);
   const [distanceError, setDistanceError] = useState('');
   const [calculating, setCalculating] = useState(false);
@@ -507,18 +523,13 @@ function BookingWizard({
     }
   }
 
-  async function book(e: React.FormEvent) {
-    e.preventDefault();
-    if (!token) {
-      onLogin();
-      return;
-    }
+  async function executeBooking(authToken: string) {
     setBusy(true);
     setError('');
     try {
       const b = await api<Booking>('/customer/bookings', {
         method: 'POST',
-        token,
+        token: authToken,
         body: {
           ...search,
           pickupPlaceId: search.pickupPlaceId || undefined,
@@ -531,11 +542,116 @@ function BookingWizard({
         },
       });
       setKey(crypto.randomUUID());
+      setOtpModal(false);
       onBooked(b);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function book(e: React.FormEvent) {
+    e.preventDefault();
+    if (!details.name.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
+    const cleanPhone = details.phone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    if (token) {
+      await executeBooking(token);
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      const otpRes = await api<{ message?: string; code?: string; mockCode?: string; retryAfterSeconds?: number }>(
+        '/auth/customer/send-otp',
+        {
+          method: 'POST',
+          body: {
+            phone: cleanPhone,
+            email: details.email?.trim() || undefined,
+          },
+        }
+      );
+      setOtpCountdown(otpRes.retryAfterSeconds || 30);
+      const codeHint = otpRes.code || otpRes.mockCode;
+      setOtpHint(
+        codeHint
+          ? `Verification code: ${codeHint}`
+          : `We sent a 6-digit verification code to +91 ${cleanPhone}${details.email ? ` and ${details.email}` : ''}.`
+      );
+      setOtpCode(codeHint || '');
+      setOtpError('');
+      setOtpModal(true);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to send verification code. Please check your phone number.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyAndBook(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanPhone = details.phone.replace(/\D/g, '');
+    if (!/^\d{6}$/.test(otpCode.trim())) {
+      setOtpError('Please enter a valid 6-digit verification code.');
+      return;
+    }
+    setOtpBusy(true);
+    setOtpError('');
+    try {
+      const authRes = await api<{ token: string; customer: any }>('/auth/customer/verify-otp', {
+        method: 'POST',
+        body: {
+          phone: cleanPhone,
+          email: details.email?.trim() || undefined,
+          code: otpCode.trim(),
+        },
+      });
+      onLoginToken(authRes.token);
+      await executeBooking(authRes.token);
+    } catch (err) {
+      setOtpError((err as Error).message || 'Invalid or expired code. Please try again.');
+    } finally {
+      setOtpBusy(false);
+    }
+  }
+
+  async function resendOtp() {
+    setOtpBusy(true);
+    setOtpError('');
+    try {
+      const cleanPhone = details.phone.replace(/\D/g, '');
+      const otpRes = await api<{ message?: string; code?: string; mockCode?: string; retryAfterSeconds?: number }>(
+        '/auth/customer/send-otp',
+        {
+          method: 'POST',
+          body: {
+            phone: cleanPhone,
+            email: details.email?.trim() || undefined,
+          },
+        }
+      );
+      setOtpCountdown(otpRes.retryAfterSeconds || 30);
+      const codeHint = otpRes.code || otpRes.mockCode;
+      setOtpHint(
+        codeHint
+          ? `New verification code: ${codeHint}`
+          : `We resent the verification code to +91 ${cleanPhone}.`
+      );
+      if (codeHint) setOtpCode(codeHint);
+    } catch (err) {
+      setOtpError((err as Error).message || 'Failed to resend code.');
+    } finally {
+      setOtpBusy(false);
     }
   }
 
@@ -762,11 +878,92 @@ function BookingWizard({
               <hr />
               <p className="notice">Instant reservation confirmation. Chauffeur and vehicle details will be dispatched prior to pickup.</p>
               <button className="primary full" disabled={busy}>
-                {busy ? 'Securing reservation…' : token ? 'Confirm Booking' : 'Sign in & Confirm'} <ArrowRight size={17} />
+                {busy ? 'Securing reservation…' : 'Confirm Booking'} <ArrowRight size={17} />
               </button>
             </aside>
           </div>
         </form>
+      )}
+
+      {otpModal && (
+        <Modal title="Verify & Confirm Booking" onClose={() => setOtpModal(false)}>
+          <form onSubmit={verifyAndBook}>
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <div style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: '#eff6ff',
+                color: '#2563eb',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 8,
+              }}>
+                <ShieldCheck size={26} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: 17 }}>Quick Contact Verification</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>
+                Confirming reservation for <strong>+91 {details.phone.replace(/\D/g, '')}</strong>
+              </p>
+            </div>
+
+            {otpError && <ErrorBox message={otpError} />}
+            {otpHint && (
+              <p className="notice" style={{ fontSize: 13, textAlign: 'center', marginBottom: 14 }}>
+                {otpHint}
+              </p>
+            )}
+
+            <label style={{ display: 'block', marginBottom: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                Enter 6-Digit Verification Code
+              </span>
+              <input
+                required
+                autoFocus
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="123456"
+                style={{
+                  fontSize: 22,
+                  letterSpacing: 6,
+                  textAlign: 'center',
+                  fontWeight: 700,
+                  padding: '12px 16px',
+                }}
+              />
+            </label>
+
+            <button type="submit" className="primary full" disabled={otpBusy || busy || otpCode.length !== 6}>
+              {otpBusy || busy ? 'Verifying & Confirming…' : 'Verify & Confirm Booking'} <ArrowRight size={17} />
+            </button>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
+              <button
+                type="button"
+                className="text-button"
+                disabled={otpBusy || otpCountdown > 0}
+                onClick={resendOtp}
+                style={{ fontSize: 13 }}
+              >
+                {otpCountdown > 0 ? `Resend code in ${otpCountdown}s` : 'Resend code'}
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setOtpModal(false)}
+                style={{ fontSize: 13, color: 'var(--muted)' }}
+              >
+                Change mobile number
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </>
   );
@@ -1285,8 +1482,8 @@ function DownloadPage({
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
             <Check size={20} color="#2563eb" />
             <div>
-              <strong style={{ fontSize: 13 }}>Real-time Database Sync</strong>
-              <small style={{ display: 'block', color: 'var(--muted)' }}>Same backend and booking IDs across Web & App</small>
+              <strong style={{ fontSize: 13 }}>Instant Journey Sync</strong>
+              <small style={{ display: 'block', color: 'var(--muted)' }}>Unified bookings & live updates across Web & App</small>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
