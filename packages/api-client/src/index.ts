@@ -28,7 +28,7 @@ export function getDefaultBaseUrl(): string {
     if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
     if (process.env.API_URL) return process.env.API_URL;
   }
-  return 'http://localhost:4100';
+  return 'https://transport-backend-pzlp.onrender.com';
 }
 
 export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
