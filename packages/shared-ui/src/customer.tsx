@@ -149,11 +149,11 @@ export default function CustomerApp() {
                 </h1>
                 <p>
                   Airport transfers, weekend getaways, and intercity travel across Karnataka.<br className="desktop" />
-                  Clean sanitised vehicles, verified drivers, and fixed transparent fares.
+                  Clean sanitised vehicles, verified drivers, and seamless private chauffeur travel.
                 </p>
                 <div className="hero-proof">
                   <span><ShieldCheck size={16} /> Verified chauffeurs</span>
-                  <span><Check size={16} /> Zero hidden charges</span>
+                  <span><Check size={16} /> Sanitized luxury cabs</span>
                   <span><Clock size={16} /> 24/7 Dispatch support</span>
                 </div>
               </div>
@@ -229,7 +229,7 @@ export default function CustomerApp() {
                       <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
                       <p>{r.distance} km · Sanitized private chauffeur</p>
                       <div className="section-title">
-                        <span>From <strong>{money(r.fixedPrice)}</strong></span>
+                        <span><strong>{r.distance} km approx.</strong></span>
                         <ArrowUpRight size={20} />
                       </div>
                     </div>
@@ -247,7 +247,7 @@ export default function CustomerApp() {
               {[
                 [ShieldCheck, 'Verified Chauffeurs', 'Background-checked, courteous drivers with commercial badges.'],
                 [Car, 'Well-Maintained Fleet', 'Sedans, SUVs, and luxury Tempo Travellers with cold AC.'],
-                [Clock, 'Zero Hidden Costs', 'Transparent pricing inclusive of base fare, driver allowance, and GST.'],
+                [Clock, 'Verified Reliable Dispatch', 'Round-the-clock chauffeur tracking, vehicle sanitization, and customer care.'],
               ].map(([Icon, title, copy]) => {
                 const I = Icon as typeof Car;
                 return (
@@ -266,7 +266,7 @@ export default function CustomerApp() {
               <div className="grid-three">
                 {[
                   ['01', 'Choose Route & Date', 'Select one-way, round trip, or multi-city with intermediate stops.'],
-                  ['02', 'Pick Your Vehicle', 'Compare Sedans, SUVs, and Tempo Travellers with all-inclusive fares.'],
+                  ['02', 'Pick Your Vehicle', 'Select Sedans, SUVs, or luxury Tempo Travellers tailored to your group.'],
                   ['03', 'Chauffeur Assigned', 'Receive instant SMS and WhatsApp confirmation with driver details.'],
                 ].map(([n, t, c]) => (
                   <div key={n}>
@@ -315,7 +315,7 @@ export default function CustomerApp() {
                     <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
                     <p>{r.distance} km approx. · Private Sedan / SUV</p>
                     <div className="section-title" style={{ marginTop: 14 }}>
-                      <span>Starting at <strong>{money(r.fixedPrice)}</strong></span>
+                      <span><strong>{r.distance} km approx.</strong></span>
                       <button
                         className="primary small"
                         onClick={() => {
@@ -371,7 +371,7 @@ export default function CustomerApp() {
         <div>
           <button onClick={() => navigate('home')}>Book on web</button>
           <button onClick={() => navigate('track')}>Track a ride</button>
-          <button onClick={() => navigate('routes')}>Routes & fares</button>
+          <button onClick={() => navigate('routes')}>Popular routes</button>
           <button onClick={() => navigate('download')}>Download APK</button>
           <a href={`tel:${config.data?.settings.phone || '+918047123456'}`}>Support</a>
           <a href="/admin" target="_blank" rel="noreferrer">
@@ -444,7 +444,7 @@ function BookingWizard({
       const req = JSON.parse(routeRequest);
       req.pickupPlaceId = req.pickupPlaceId || 'place_pk_' + encodeURIComponent(req.pickup.trim().toLowerCase()).slice(0, 20);
       req.dropPlaceId = req.dropPlaceId || 'place_dp_' + encodeURIComponent(req.drop.trim().toLowerCase()).slice(0, 20);
-      apiClient<{ distance: number }>('/maps/distance', { baseUrl: '/api', method: 'POST', body: req, signal: controller.signal })
+      apiClient<{ distance: number }>('/maps/distance', { method: 'POST', body: req, signal: controller.signal })
         .then(r => { if (!controller.signal.aborted) setDistance(r.distance); })
         .catch(e => { if (!controller.signal.aborted) setDistanceError(e.message); })
         .finally(() => { if (!controller.signal.aborted) setCalculating(false); });
@@ -521,6 +521,9 @@ function BookingWizard({
         token,
         body: {
           ...search,
+          pickupPlaceId: search.pickupPlaceId || undefined,
+          dropPlaceId: search.dropPlaceId || undefined,
+          stopPlaceIds: search.stopPlaceIds?.filter(Boolean).length ? search.stopPlaceIds : undefined,
           stops: search.tripType === 'MULTI_CITY' ? search.stops.filter((s) => s.trim().length > 0) : undefined,
           ...details,
           vehicleType: quote?.type,
@@ -618,7 +621,7 @@ function BookingWizard({
             )}
 
             <button className="primary" disabled={busy || !routeReady || calculating}>
-              {busy ? 'Calculating fares…' : 'Find rides'} <ArrowRight size={18} />
+              {busy ? 'Finding available rides…' : 'Find rides'} <ArrowRight size={18} />
             </button>
           </div>
 
@@ -660,7 +663,7 @@ function BookingWizard({
             {distance !== null && <span className="google-attribution" translate="no">Google Maps</span>}
           </div>
           <div className="booking-footnote">
-            <ShieldCheck size={14} /> Fixed transparent pricing • No surge on booked rides • Chauffeur allowance included
+            <ShieldCheck size={14} /> Verified commercial chauffeurs • Sanitized air-conditioned fleet • 24/7 journey support
           </div>
         </form>
       )}
@@ -697,9 +700,8 @@ function BookingWizard({
                   <span><Wind size={15} /> {v.ac ? 'Climate Controlled AC' : 'Non-AC'}</span>
                   <span><Luggage size={15} /> Luggage boot</span>
                 </div>
-                <div className="section-title">
-                  <strong className="price">{money(v.fare)}</strong>
-                  <span className="primary small">
+                <div className="section-title" style={{ marginTop: 12 }}>
+                  <span className="primary small" style={{ width: '100%', justifyContent: 'center' }}>
                     Select ride <ArrowRight size={16} />
                   </span>
                 </div>
@@ -750,21 +752,17 @@ function BookingWizard({
               </label>
             </div>
             <aside className="fare-summary">
-              <p className="eyebrow">FARE BREAKDOWN</p>
+              <p className="eyebrow">TRIP SUMMARY</p>
               <h3>
                 {search.pickup} {search.stops.length > 0 ? `via ${search.stops.filter(Boolean).join(', ')} ` : ''}→ {search.drop}
               </h3>
               <p>{search.date} · {search.time}</p>
+              {distance && <p>{distance} km by road {search.tripType === 'ROUND_TRIP' ? '· includes return journey' : ''}</p>}
               <p>{quote.type} ({quote.model}) · {details.passengers} passenger(s)</p>
               <hr />
-              <div className="section-title">
-                <span>Total Payable</span>
-                <strong className="price">{money(quote.fare)}</strong>
-              </div>
-              <p className="muted small-text">Includes fuel, driver allowance, and GST. Tolls at actuals.</p>
-              <p className="notice">No advance payment required. Settle the fare directly with the driver after your trip.</p>
+              <p className="notice">Instant reservation confirmation. Chauffeur and vehicle details will be dispatched prior to pickup.</p>
               <button className="primary full" disabled={busy}>
-                {busy ? 'Securing reservation…' : token ? `Confirm Booking · ${money(quote.fare)}` : 'Sign in & Confirm'} <ArrowRight size={17} />
+                {busy ? 'Securing reservation…' : token ? 'Confirm Booking' : 'Sign in & Confirm'} <ArrowRight size={17} />
               </button>
             </aside>
           </div>
@@ -1001,10 +999,9 @@ function CustomerDetail({
         <BookingInfo b={b} />
         {error && <ErrorBox message={error} />}
         <div className="actions">
-          <Invoice id={id} token={token} prefix="customer" />
           <a
             className="secondary"
-            href={`https://wa.me/?text=${encodeURIComponent(`Miles & Moments Journey #${b.bookingNumber}: ${b.pickup} → ${b.drop} on ${b.date} at ${b.time}. Fare: ${money(b.fare)}`)}`}
+            href={`https://wa.me/?text=${encodeURIComponent(`Miles & Moments Journey #${b.bookingNumber}: ${b.pickup} → ${b.drop} on ${b.date} at ${b.time}. Vehicle: ${b.vehicleType}`)}`}
             target="_blank"
             rel="noreferrer"
           >

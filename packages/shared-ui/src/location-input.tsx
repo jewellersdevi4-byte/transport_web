@@ -17,7 +17,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setLoading(true);
-      apiClient<{ suggestions: Place[] }>(`/maps/suggestions?input=${encodeURIComponent(value.trim())}`, { baseUrl: '/api', signal: controller.signal })
+      apiClient<{ suggestions: Place[] }>(`/maps/suggestions?input=${encodeURIComponent(value.trim())}`, { signal: controller.signal })
         .then(r => { if (!controller.signal.aborted) setItems(r.suggestions || []); })
         .catch(e => { if (!controller.signal.aborted) setError(e.message); })
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
