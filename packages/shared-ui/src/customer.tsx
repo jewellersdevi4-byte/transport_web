@@ -1,0 +1,1310 @@
+'use client';
+import { LocationInput } from './location-input';
+import { apiClient } from '../../api-client/src/index';
+import { useEffect, useState } from 'react';
+import {
+  Car,
+  ArrowRight,
+  ArrowUpRight,
+  MapPin,
+  ShieldCheck,
+  Clock,
+  Smartphone,
+  Check,
+  Users,
+  Luggage,
+  Wind,
+  ChevronLeft,
+  Route as RouteIcon,
+  QrCode,
+  User,
+  FileText,
+  Phone,
+  Search as SearchIcon,
+  Compass,
+  Download,
+  Calendar,
+  Sparkles,
+  ExternalLink
+} from 'lucide-react';
+import type { Booking, Customer, Route, Settings, Vehicle } from '../../shared-types/src/index';
+import {
+  Auth,
+  Badge,
+  BookingCard,
+  BookingInfo,
+  Empty,
+  ErrorBox,
+  Invoice,
+  Loading,
+  Modal,
+  api,
+  money,
+  label,
+  useResource,
+  useSession,
+  type DetailBooking,
+} from './common';
+
+type Search = {
+  pickupPlaceId?: string;
+  dropPlaceId?: string;
+  stopPlaceIds?: string[];
+  pickup: string;
+  drop: string;
+  date: string;
+  time: string;
+  tripType: 'ONE_WAY' | 'ROUND_TRIP' | 'MULTI_CITY';
+  returnDate: string;
+  stops: string[];
+};
+
+type Quote = Vehicle & { fare: number };
+
+export default function CustomerApp() {
+  const session = useSession('customer');
+  const [page, setPage] = useState('home');
+  const [activeTab, setActiveTab] = useState<'book' | 'track'>('book');
+  const [auth, setAuth] = useState(false);
+  const [selectedId, setSelectedId] = useState('');
+  const [success, setSuccess] = useState(false);
+  const config = useResource<{ settings: Settings; routes: Route[]; mockMode: boolean }>('/public/config');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/download') setPage('download');
+      else if (path === '/track') setPage('track');
+    }
+  }, []);
+
+  function navigate(p: string) {
+    setPage(p);
+    setSuccess(false);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  return (
+    <>
+      <header className="customer-header">
+        <a
+          className="brand"
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            navigate('home');
+          }}
+        >
+          <span className="brand-icon">
+            <RouteIcon size={22} />
+          </span>
+          miles<span className="brand-light">&moments</span>
+        </a>
+
+        <nav>
+          <button className={page === 'home' && activeTab === 'book' ? 'active' : ''} onClick={() => { setActiveTab('book'); navigate('home'); }}>
+            Book a ride
+          </button>
+          <button className={page === 'track' || (page === 'home' && activeTab === 'track') ? 'active' : ''} onClick={() => { setActiveTab('track'); navigate('track'); }}>
+            <SearchIcon size={15} style={{ verticalAlign: 'text-bottom' }} /> Track trip
+          </button>
+          <button className={page === 'routes' ? 'active' : ''} onClick={() => navigate('routes')}>
+            <Compass size={15} style={{ verticalAlign: 'text-bottom' }} /> Popular routes
+          </button>
+          <button className={page === 'bookings' ? 'active' : ''} onClick={() => { navigate('bookings'); if (!session.token) setAuth(true); }}>
+            My bookings
+          </button>
+          <button className={page === 'download' ? 'active' : ''} onClick={() => navigate('download')}>
+            <Smartphone size={15} style={{ verticalAlign: 'text-bottom' }} /> Android App
+          </button>
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button className="secondary small" onClick={() => (session.token ? navigate('profile') : setAuth(true))}>
+            {session.token ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <User size={15} /> My account
+              </span>
+            ) : (
+              'Sign in'
+            )}
+            <ArrowUpRight size={15} />
+          </button>
+        </div>
+      </header>
+
+      <main>
+        {page === 'home' && (
+          <>
+            <section className="hero">
+              <div className="hero-copy">
+                <div className="prod-hero-badge">
+                  <span className="green-dot" /> PREMIUM CHAUFFEUR & OUTSTATION SERVICE
+                </div>
+                <h1>
+                  Good roads.<br />
+                  Great <em>memories.</em>
+                </h1>
+                <p>
+                  Airport transfers, weekend getaways, and intercity travel across Karnataka.<br className="desktop" />
+                  Clean sanitised vehicles, verified drivers, and fixed transparent fares.
+                </p>
+                <div className="hero-proof">
+                  <span><ShieldCheck size={16} /> Verified chauffeurs</span>
+                  <span><Check size={16} /> Zero hidden charges</span>
+                  <span><Clock size={16} /> 24/7 Dispatch support</span>
+                </div>
+              </div>
+              <div className="hero-art" aria-label="Scenic Karnataka highway illustration">
+                <div className="sun" />
+                <div className="hill hill-back" />
+                <div className="hill hill-front" />
+                <div className="road" />
+                <div className="road-line" />
+                <div className="destination-pin">
+                  <MapPin size={26} />
+                </div>
+                <div className="art-car">
+                  <Car size={110} strokeWidth={1.4} />
+                </div>
+                <div className="floating-card">
+                  <span className="green-dot" /> Karnataka & South India
+                  <small>Bengaluru → Mysuru, Coorg, Ooty, Chikmagalur</small>
+                </div>
+              </div>
+            </section>
+
+            <section id="book" className="booking-panel">
+              <div className="tab-switcher">
+                <button className={activeTab === 'book' ? 'active' : ''} onClick={() => setActiveTab('book')}>
+                  <Car size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Book a new journey
+                </button>
+                <button className={activeTab === 'track' ? 'active' : ''} onClick={() => setActiveTab('track')}>
+                  <SearchIcon size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Track booking by ID
+                </button>
+              </div>
+
+              {activeTab === 'book' ? (
+                <BookingWizard
+                  token={session.token}
+                  onLogin={() => setAuth(true)}
+                  routes={config.data?.routes || []}
+                  onBooked={(b) => {
+                    setSelectedId(b.id);
+                    setSuccess(true);
+                    setPage('detail');
+                  }}
+                />
+              ) : (
+                <TrackTripInline onOpenBooking={(id) => { setSelectedId(id); setPage('detail'); }} />
+              )}
+            </section>
+
+            <section className="content-section">
+              <div className="section-title">
+                <div>
+                  <p className="eyebrow">POPULAR OUTSTATION ESCAPES</p>
+                  <h2>Familiar routes. Pure comfort.</h2>
+                </div>
+                <span className="muted">Direct intercity private cabs from Bengaluru</span>
+              </div>
+              <div className="route-cards">
+                {(config.data?.routes || []).map((r, i) => (
+                  <button
+                    key={r.id}
+                    className={`route-card route-${i}`}
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('choose-route', { detail: r }));
+                      setActiveTab('book');
+                      document.getElementById('book')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    <div className="route-art">
+                      <span>{['✈', '♜', '⌂'][i % 3]}</span>
+                      <p>{['AIRPORT RUNWAY EXPRESS', 'HERITAGE HIGHWAY', 'SCENIC HILL ESCAPE'][i % 3]}</p>
+                    </div>
+                    <div className="route-body">
+                      <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
+                      <p>{r.distance} km · Sanitized private chauffeur</p>
+                      <div className="section-title">
+                        <span>From <strong>{money(r.fixedPrice)}</strong></span>
+                        <ArrowUpRight size={20} />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="benefits content-section">
+              <div>
+                <p className="eyebrow">THE MILES & MOMENTS STANDARD</p>
+                <h2>A superior journey,<br />from the first tap.</h2>
+                <p className="muted">Every vehicle and driver is strictly verified for safety and comfort.</p>
+              </div>
+              {[
+                [ShieldCheck, 'Verified Chauffeurs', 'Background-checked, courteous drivers with commercial badges.'],
+                [Car, 'Well-Maintained Fleet', 'Sedans, SUVs, and luxury Tempo Travellers with cold AC.'],
+                [Clock, 'Zero Hidden Costs', 'Transparent pricing inclusive of base fare, driver allowance, and GST.'],
+              ].map(([Icon, title, copy]) => {
+                const I = Icon as typeof Car;
+                return (
+                  <div key={String(title)}>
+                    <I className="feature-icon" />
+                    <h3>{String(title)}</h3>
+                    <p className="muted">{String(copy)}</p>
+                  </div>
+                );
+              })}
+            </section>
+
+            <section className="how content-section">
+              <p className="eyebrow">EFFORTLESS 3-STEP RESERVATION</p>
+              <h2>Seamless travel, start to finish.</h2>
+              <div className="grid-three">
+                {[
+                  ['01', 'Choose Route & Date', 'Select one-way, round trip, or multi-city with intermediate stops.'],
+                  ['02', 'Pick Your Vehicle', 'Compare Sedans, SUVs, and Tempo Travellers with all-inclusive fares.'],
+                  ['03', 'Chauffeur Assigned', 'Receive instant SMS and WhatsApp confirmation with driver details.'],
+                ].map(([n, t, c]) => (
+                  <div key={n}>
+                    <span className="step-number">{n}</span>
+                    <h3>{t}</h3>
+                    <p className="muted">{c}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="app-banner content-section">
+              <div>
+                <span className="security-badge"><ShieldCheck size={14} /> Official Android Release</span>
+                <h2>Travel with our companion Android app.</h2>
+                <p>Install the lightweight Android APK directly onto your phone for 1-tap bookings and offline driver contacts.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button className="primary" onClick={() => navigate('download')}>
+                  <Download size={18} /> Download Android APK (24.8 MB) <ArrowRight size={18} />
+                </button>
+              </div>
+            </section>
+          </>
+        )}
+
+        {page === 'track' && (
+          <div className="page narrow">
+            <TrackTripPage onOpenBooking={(id) => { setSelectedId(id); setPage('detail'); }} />
+          </div>
+        )}
+
+        {page === 'routes' && (
+          <div className="page">
+            <p className="eyebrow">EXPLORE SOUTH INDIA</p>
+            <h1>Popular Outstation Routes</h1>
+            <p className="muted">Transparent, all-inclusive pricing for top destinations from Bengaluru.</p>
+            <div className="route-cards" style={{ marginTop: 28 }}>
+              {(config.data?.routes || []).map((r, i) => (
+                <div key={r.id} className={`route-card route-${i}`}>
+                  <div className="route-art">
+                    <span>{['✈', '♜', '⌂'][i % 3]}</span>
+                    <p>{r.origin.toUpperCase()} → {r.destination.toUpperCase()}</p>
+                  </div>
+                  <div className="route-body">
+                    <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
+                    <p>{r.distance} km approx. · Private Sedan / SUV</p>
+                    <div className="section-title" style={{ marginTop: 14 }}>
+                      <span>Starting at <strong>{money(r.fixedPrice)}</strong></span>
+                      <button
+                        className="primary small"
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('choose-route', { detail: r }));
+                          setActiveTab('book');
+                          navigate('home');
+                        }}
+                      >
+                        Book this route
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {page === 'download' && (
+          <DownloadPage settings={config.data?.settings} onHome={() => navigate('home')} />
+        )}
+
+        {page === 'bookings' && (
+          session.token ? (
+            <MyBookings token={session.token} onOpen={(id) => { setSelectedId(id); setPage('detail'); }} />
+          ) : (
+            <div className="page narrow">
+              <Auth onLogin={(t) => { session.login(t); setAuth(false); }} />
+            </div>
+          )
+        )}
+
+        {page === 'detail' && (
+          <CustomerDetail id={selectedId} token={session.token} success={success} onBack={() => navigate('bookings')} />
+        )}
+
+        {page === 'profile' && (
+          session.token ? (
+            <Profile token={session.token} logout={() => { session.logout(); navigate('home'); }} />
+          ) : (
+            <div className="page narrow">
+              <Auth onLogin={session.login} />
+            </div>
+          )
+        )}
+      </main>
+
+      <footer>
+        <div className="brand">
+          <RouteIcon /> miles&moments
+        </div>
+        <p>Premium cab booking & outstation journeys across Karnataka and South India.</p>
+        <div>
+          <button onClick={() => navigate('home')}>Book on web</button>
+          <button onClick={() => navigate('track')}>Track a ride</button>
+          <button onClick={() => navigate('routes')}>Routes & fares</button>
+          <button onClick={() => navigate('download')}>Download APK</button>
+          <a href={`tel:${config.data?.settings.phone || '+918047123456'}`}>Support</a>
+          <a href="/admin" target="_blank" rel="noreferrer">
+            Admin Portal <ExternalLink size={12} style={{ verticalAlign: 'middle' }} />
+          </a>
+        </div>
+        <small>© {new Date().getFullYear()} Miles & Moments Travel Technologies Pvt Ltd · Bengaluru, India</small>
+      </footer>
+
+      {auth && (
+        <Modal title="Sign in with Email" onClose={() => setAuth(false)}>
+          <Auth onLogin={(t) => { session.login(t); setAuth(false); }} />
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function BookingWizard({
+  token,
+  onLogin,
+  routes,
+  onBooked,
+}: {
+  token: string;
+  onLogin: () => void;
+  routes: Route[];
+  onBooked: (b: Booking) => void;
+}) {
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const [search, setSearch] = useState<Search>({
+    pickup: '',
+    drop: '',
+    date: tomorrow,
+    time: '09:00',
+    tripType: 'ONE_WAY',
+    returnDate: tomorrow,
+    stops: [],
+  });
+  const [step, setStep] = useState(0);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [estimated, setEstimated] = useState(true);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [details, setDetails] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    passengers: 2,
+    luggage: 1,
+    requests: '',
+    paymentMethod: 'CASH' as const,
+  });
+  const [distance, setDistance] = useState<number | null>(null);
+  const [distanceError, setDistanceError] = useState('');
+  const [calculating, setCalculating] = useState(false);
+  const routeReady = Boolean(
+    (search.pickupPlaceId || search.pickup.trim().length >= 3) &&
+    (search.dropPlaceId || search.drop.trim().length >= 3) &&
+    (search.tripType !== 'MULTI_CITY' || (search.stops.length > 0 && search.stops.every((s) => s.trim().length >= 3)))
+  );
+  const routeRequest = JSON.stringify(search);
+  useEffect(() => {
+    setDistance(null); setDistanceError(''); setCalculating(false); setQuotes([]); setQuote(null);
+    if (!routeReady) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setCalculating(true);
+      const req = JSON.parse(routeRequest);
+      req.pickupPlaceId = req.pickupPlaceId || 'place_pk_' + encodeURIComponent(req.pickup.trim().toLowerCase()).slice(0, 20);
+      req.dropPlaceId = req.dropPlaceId || 'place_dp_' + encodeURIComponent(req.drop.trim().toLowerCase()).slice(0, 20);
+      apiClient<{ distance: number }>('/maps/distance', { baseUrl: '/api', method: 'POST', body: req, signal: controller.signal })
+        .then(r => { if (!controller.signal.aborted) setDistance(r.distance); })
+        .catch(e => { if (!controller.signal.aborted) setDistanceError(e.message); })
+        .finally(() => { if (!controller.signal.aborted) setCalculating(false); });
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [routeRequest, routeReady]);
+  const [key, setKey] = useState('');
+
+  useEffect(() => {
+    setKey(crypto.randomUUID());
+    const handler = (e: Event) => {
+      const r = (e as CustomEvent<Route>).detail;
+      setSearch((s) => ({ ...s, pickup: r.origin, drop: r.destination, tripType: 'ONE_WAY', stops: [], pickupPlaceId: '', dropPlaceId: '', stopPlaceIds: [] }));
+      setStep(0);
+    };
+    window.addEventListener('choose-route', handler);
+    return () => window.removeEventListener('choose-route', handler);
+  }, []);
+
+  useEffect(() => {
+    if (token) {
+      api<Customer>('/customer/profile', { token })
+        .then((c) => setDetails((d) => ({ ...d, name: c.name || d.name, phone: c.phone || d.phone, email: c.email || d.email })))
+        .catch(() => {});
+    }
+  }, [token]);
+
+  async function find(e: React.FormEvent) {
+    e.preventDefault();
+    if (!routeReady) { setError('Please enter or select pickup and destination locations.'); return; }
+    setBusy(true);
+    setError('');
+    try {
+      const pId = search.pickupPlaceId || 'place_pk_' + encodeURIComponent(search.pickup.trim().toLowerCase()).slice(0, 20);
+      const dId = search.dropPlaceId || 'place_dp_' + encodeURIComponent(search.drop.trim().toLowerCase()).slice(0, 20);
+      const params = new URLSearchParams({
+        pickupPlaceId: pId,
+        dropPlaceId: dId,
+        pickup: search.pickup,
+        drop: search.drop,
+        date: search.date,
+        time: search.time,
+        tripType: search.tripType,
+      });
+      if (search.tripType === 'ROUND_TRIP' && search.returnDate) params.set('returnDate', search.returnDate);
+      if (search.tripType === 'MULTI_CITY') {
+        const validStops = search.stops.map((s) => s.trim()).filter(Boolean);
+        params.set('stops', JSON.stringify(validStops));
+        params.set('stopPlaceIds', JSON.stringify(search.stopPlaceIds || []));
+      }
+      const r = await api<{ vehicles: Quote[]; estimated: boolean; distance: number }>(`/customer/vehicles/available?${params.toString()}`);
+      setQuotes(r.vehicles);
+      setEstimated(r.estimated);
+      setDistance(r.distance);
+      setStep(1);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function book(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token) {
+      onLogin();
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const b = await api<Booking>('/customer/bookings', {
+        method: 'POST',
+        token,
+        body: {
+          ...search,
+          stops: search.tripType === 'MULTI_CITY' ? search.stops.filter((s) => s.trim().length > 0) : undefined,
+          ...details,
+          vehicleType: quote?.type,
+          idempotencyKey: key,
+        },
+      });
+      setKey(crypto.randomUUID());
+      onBooked(b);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="section-title">
+        <h2>{['Where would you like to travel?', 'Select your preferred vehicle.', 'Enter passenger details.'][step]}</h2>
+        <span className="muted">{step + 1} of 3 · Search → Fleet → Confirm</span>
+      </div>
+      {error && <ErrorBox message={error} />}
+      <div className="steps">
+        <span className={step === 0 ? 'current' : ''}>01 Route & Schedule</span>
+        <span className={step === 1 ? 'current' : ''}>02 Vehicle Choice</span>
+        <span className={step === 2 ? 'current' : ''}>03 Passenger Details</span>
+      </div>
+
+      {step === 0 && (
+        <form onSubmit={find}>
+          <div className="segmented">
+            {(['ONE_WAY', 'ROUND_TRIP', 'MULTI_CITY'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={search.tripType === t ? 'selected' : ''}
+                onClick={() => {
+                  setSearch({
+                    ...search,
+                    tripType: t,
+                    stops: t === 'MULTI_CITY' ? (search.stops.length ? search.stops : ['']) : [],
+                  });
+                }}
+              >
+                {t === 'ONE_WAY' ? 'One way' : t === 'ROUND_TRIP' ? 'Round trip' : 'Multi-city'}
+              </button>
+            ))}
+          </div>
+
+          <div className="search-grid">
+            <label>
+              <span><MapPin size={15} /> Pickup location</span>
+              <LocationInput value={search.pickup} placeId={search.pickupPlaceId} placeholder="Search pickup address"
+                onChange={(value, placeId) => setSearch({ ...search, pickup: value, pickupPlaceId: placeId })} />
+            </label>
+
+            <label>
+              <span><MapPin size={15} /> Destination</span>
+              <LocationInput value={search.drop} placeId={search.dropPlaceId} placeholder="Search destination address"
+                onChange={(value, placeId) => setSearch({ ...search, drop: value, dropPlaceId: placeId })} />
+            </label>
+
+            <label>
+              Departure date
+              <input
+                required
+                type="date"
+                min={new Date().toISOString().slice(0, 10)}
+                value={search.date}
+                onChange={(e) => setSearch({ ...search, date: e.target.value })}
+              />
+            </label>
+
+            <label>
+              Pickup time
+              <input
+                required
+                type="time"
+                value={search.time}
+                onChange={(e) => setSearch({ ...search, time: e.target.value })}
+              />
+            </label>
+
+            {search.tripType === 'ROUND_TRIP' && (
+              <label>
+                Return date
+                <input
+                  type="date"
+                  required
+                  min={search.date}
+                  value={search.returnDate}
+                  onChange={(e) => setSearch({ ...search, returnDate: e.target.value })}
+                />
+              </label>
+            )}
+
+            <button className="primary" disabled={busy || !routeReady || calculating}>
+              {busy ? 'Calculating fares…' : 'Find rides'} <ArrowRight size={18} />
+            </button>
+          </div>
+
+          {search.tripType === 'MULTI_CITY' && (
+            <div className="multi-city-stops">
+              <p className="eyebrow">INTERMEDIATE STOPS</p>
+              {search.stops.map((stop, i) => (
+                <div key={i} className="stop-input-row">
+                  <label>
+                    <span><MapPin size={15} /> Stop {i + 1}</span>
+                    <LocationInput value={stop} placeId={search.stopPlaceIds?.[i]} placeholder={`Search stop ${i + 1}`}
+                      onChange={(value, placeId) => { const stops = [...search.stops]; const ids = [...(search.stopPlaceIds || [])]; stops[i] = value; ids[i] = placeId; setSearch({...search, stops, stopPlaceIds: ids}); }} />
+                  </label>
+                  {search.stops.length > 1 && (
+                    <button
+                      type="button"
+                      className="text-button remove-stop"
+                      onClick={() => setSearch({ ...search, stops: search.stops.filter((_, n) => n !== i), stopPlaceIds: search.stopPlaceIds?.filter((_, n) => n !== i) })}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+              {search.stops.length < 5 && (
+                <button
+                  type="button"
+                  className="secondary small add-stop-btn"
+                  onClick={() => setSearch({ ...search, stops: [...search.stops, ''], stopPlaceIds: [...(search.stopPlaceIds || []), ''] })}
+                >
+                  + Add intermediate stop
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="route-distance" role="status">
+            {calculating ? 'Calculating driving distance…' : distanceError || (distance !== null ? `${distance} km by road${search.tripType === 'ROUND_TRIP' ? ' · includes return journey' : ''}` : 'Select locations from the suggestions to calculate driving distance.')}
+            {distance !== null && <span className="google-attribution" translate="no">Google Maps</span>}
+          </div>
+          <div className="booking-footnote">
+            <ShieldCheck size={14} /> Fixed transparent pricing • No surge on booked rides • Chauffeur allowance included
+          </div>
+        </form>
+      )}
+
+      {step === 1 && (
+        <>
+          <p className="notice">{distance} km by road{search.tripType === 'ROUND_TRIP' ? ' · includes return journey' : ''}</p>
+          <button className="text-button" onClick={() => setStep(0)}>
+            <ChevronLeft size={16} /> Edit trip route & time
+          </button>
+          <p className="muted">
+            {search.pickup} {search.stops.length > 0 ? `via ${search.stops.filter(Boolean).join(' → ')} ` : ''}→ {search.drop} · {search.date} at {search.time}
+          </p>
+          <div className="grid-three">
+            {quotes.map((v) => (
+              <button
+                key={v.id}
+                className={`vehicle-card ${quote?.id === v.id ? 'selected' : ''}`}
+                onClick={() => {
+                  setQuote(v);
+                  setStep(2);
+                }}
+              >
+                <div className="vehicle-illustration">
+                  <Car size={85} strokeWidth={1.2} />
+                </div>
+                <div className="section-title">
+                  <h3>{v.type}</h3>
+                  <Badge value="Available" />
+                </div>
+                <p className="muted">{v.model} or verified equivalent</p>
+                <div className="vehicle-features">
+                  <span><Users size={15} /> {v.capacity} passenger seats</span>
+                  <span><Wind size={15} /> {v.ac ? 'Climate Controlled AC' : 'Non-AC'}</span>
+                  <span><Luggage size={15} /> Luggage boot</span>
+                </div>
+                <div className="section-title">
+                  <strong className="price">{money(v.fare)}</strong>
+                  <span className="primary small">
+                    Select ride <ArrowRight size={16} />
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+          {quotes.length === 0 && (
+            <Empty title="No vehicles available for the requested time.">
+              <p>Please adjust your date or pickup time.</p>
+              <button className="primary" onClick={() => setStep(0)}>
+                Change search
+              </button>
+            </Empty>
+          )}
+        </>
+      )}
+
+      {step === 2 && quote && (
+        <form onSubmit={book}>
+          <button type="button" className="text-button" onClick={() => setStep(1)}>
+            <ChevronLeft size={16} /> Choose a different vehicle
+          </button>
+          <div className="booking-details-grid">
+            <div className="form-grid">
+              <label>
+                Full Name
+                <input required minLength={2} value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} />
+              </label>
+              <label>
+                10-Digit Mobile Number
+                <input required pattern="[6-9][0-9]{9}" type="tel" value={details.phone} onChange={(e) => setDetails({ ...details, phone: e.target.value })} />
+              </label>
+              <label>
+                Email Address (for GST receipt)
+                <input type="email" value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} />
+              </label>
+              <label>
+                Passenger Count
+                <input required type="number" min={1} max={quote.capacity} value={details.passengers} onChange={(e) => setDetails({ ...details, passengers: Number(e.target.value) })} />
+              </label>
+              <label>
+                Luggage Pieces
+                <input required type="number" min={0} max={20} value={details.luggage} onChange={(e) => setDetails({ ...details, luggage: Number(e.target.value) })} />
+              </label>
+              <label>
+                Special Pickup Requests (optional)
+                <textarea maxLength={500} value={details.requests} onChange={(e) => setDetails({ ...details, requests: e.target.value })} placeholder="Flight/Train number, terminal pickup, child seat…" />
+              </label>
+            </div>
+            <aside className="fare-summary">
+              <p className="eyebrow">FARE BREAKDOWN</p>
+              <h3>
+                {search.pickup} {search.stops.length > 0 ? `via ${search.stops.filter(Boolean).join(', ')} ` : ''}→ {search.drop}
+              </h3>
+              <p>{search.date} · {search.time}</p>
+              <p>{quote.type} ({quote.model}) · {details.passengers} passenger(s)</p>
+              <hr />
+              <div className="section-title">
+                <span>Total Payable</span>
+                <strong className="price">{money(quote.fare)}</strong>
+              </div>
+              <p className="muted small-text">Includes fuel, driver allowance, and GST. Tolls at actuals.</p>
+              <p className="notice">No advance payment required. Settle the fare directly with the driver after your trip.</p>
+              <button className="primary full" disabled={busy}>
+                {busy ? 'Securing reservation…' : token ? `Confirm Booking · ${money(quote.fare)}` : 'Sign in & Confirm'} <ArrowRight size={17} />
+              </button>
+            </aside>
+          </div>
+        </form>
+      )}
+    </>
+  );
+}
+
+function TrackTripInline({ onOpenBooking }: { onOpenBooking: (id: string) => void }) {
+  const [bookingNumber, setBookingNumber] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [trip, setTrip] = useState<DetailBooking | null>(null);
+
+  async function handleTrack(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setTrip(null);
+    try {
+      const res = await api<DetailBooking>(`/public/track?bookingNumber=${encodeURIComponent(bookingNumber.trim())}&phone=${encodeURIComponent(phone.trim())}`);
+      setTrip(res);
+    } catch (err) {
+      setError((err as Error).message || 'No booking found. Please check your Booking Reference and phone number.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: '10px 0' }}>
+      <div className="track-hero">
+        <p className="eyebrow">REAL-TIME JOURNEY DISPATCH STATUS</p>
+        <h2>Track your booking instantly</h2>
+        <p className="muted">Enter your Booking Reference (e.g. TRV-1024) and registered 10-digit mobile number.</p>
+      </div>
+
+      <form onSubmit={handleTrack} className="track-form-grid">
+        <label style={{ margin: 0 }}>
+          <span>Booking Reference</span>
+          <input
+            required
+            placeholder="e.g. TRV-1024"
+            value={bookingNumber}
+            onChange={(e) => setBookingNumber(e.target.value)}
+          />
+        </label>
+        <label style={{ margin: 0 }}>
+          <span>Registered Mobile Number</span>
+          <input
+            required
+            type="tel"
+            pattern="[0-9]{10}"
+            placeholder="e.g. 9876543210"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </label>
+        <button className="primary" disabled={loading} style={{ height: 45 }}>
+          {loading ? 'Searching…' : 'Track Ride'} <SearchIcon size={16} />
+        </button>
+      </form>
+
+      {error && <ErrorBox message={error} />}
+
+      {trip && (
+        <div className="card" style={{ padding: 24, marginTop: 24, background: '#f8fafc', borderColor: '#cbd5e1' }}>
+          <div className="track-result-header">
+            <div>
+              <span className="eyebrow">BOOKING REF #{trip.bookingNumber}</span>
+              <h3 style={{ margin: '4px 0', fontSize: 20 }}>{trip.pickup} → {trip.drop}</h3>
+              <p className="muted" style={{ margin: 0 }}>{trip.date} at {trip.time} · {trip.vehicleType}</p>
+            </div>
+            <Badge value={trip.status} />
+          </div>
+
+          {trip.driver ? (
+            <div className="driver-dispatch-box">
+              <div className="driver-dispatch-avatar">
+                {trip.driver.name[0]}
+              </div>
+              <div>
+                <strong style={{ fontSize: 16 }}>{trip.driver.name}</strong>
+                <p style={{ margin: '2px 0', color: '#166534', fontWeight: 600 }}>
+                  Assigned Driver · ★ {trip.driver.rating} ({trip.driver.trips} trips)
+                </p>
+                <small style={{ color: 'var(--muted)' }}>
+                  Vehicle: {trip.vehicle?.model} ({trip.vehicle?.number})
+                </small>
+              </div>
+              <div className="driver-dispatch-actions">
+                <a className="primary small" href={`tel:${trip.driver.phone}`}>
+                  <Phone size={14} /> Call Chauffeur
+                </a>
+                <a
+                  className="secondary small"
+                  href={`https://wa.me/91${trip.driver.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hello ${trip.driver.name}, I am following up on booking #${trip.bookingNumber} (${trip.pickup} to ${trip.drop}).`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  WhatsApp
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: 16, borderRadius: 10, margin: '16px 0' }}>
+              <strong style={{ color: '#92400e', display: 'block' }}>Chauffeur Assignment in Progress</strong>
+              <small style={{ color: '#b45309' }}>
+                Our 24/7 Bengaluru dispatch team is assigning an experienced driver for your {trip.vehicleType}. You will receive a WhatsApp notification shortly.
+              </small>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 12, marginTop: 18, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+            <button className="primary small" onClick={() => onOpenBooking(trip.id)}>
+              View Full Trip Summary & Invoice <ArrowRight size={14} />
+            </button>
+            <a
+              className="secondary small"
+              href={`https://wa.me/?text=${encodeURIComponent(`Track my trip #${trip.bookingNumber}: ${trip.pickup} to ${trip.drop} on ${trip.date} at ${trip.time}. Status: ${trip.status}`)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Share via WhatsApp
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrackTripPage({ onOpenBooking }: { onOpenBooking: (id: string) => void }) {
+  return (
+    <div className="track-card">
+      <TrackTripInline onOpenBooking={onOpenBooking} />
+    </div>
+  );
+}
+
+function MyBookings({ token, onOpen }: { token: string; onOpen: (id: string) => void }) {
+  const r = useResource<Booking[]>('/customer/bookings', token);
+  const [tab, setTab] = useState('Upcoming');
+
+  return (
+    <div className="page">
+      <p className="eyebrow">YOUR JOURNEY DASHBOARD</p>
+      <h1>My Bookings</h1>
+      <div className="segmented">
+        {['Upcoming', 'Completed', 'Cancelled'].map((t) => (
+          <button key={t} className={tab === t ? 'selected' : ''} onClick={() => setTab(t)}>
+            {t}
+          </button>
+        ))}
+      </div>
+      {r.loading ? (
+        <Loading />
+      ) : r.error ? (
+        <ErrorBox message={r.error} retry={r.reload} />
+      ) : (
+        <div className="grid-two">
+          {r.data
+            ?.filter((b) =>
+              tab === 'Completed'
+                ? b.status === 'COMPLETED'
+                : tab === 'Cancelled'
+                ? b.status === 'CANCELLED'
+                : !['COMPLETED', 'CANCELLED'].includes(b.status)
+            )
+            .map((b) => (
+              <BookingCard key={b.id} booking={b} onClick={() => onOpen(b.id)} />
+            ))}
+        </div>
+      )}
+      {!r.loading &&
+        r.data?.filter((b) =>
+          tab === 'Completed'
+            ? b.status === 'COMPLETED'
+            : tab === 'Cancelled'
+            ? b.status === 'CANCELLED'
+            : !['COMPLETED', 'CANCELLED'].includes(b.status)
+        ).length === 0 && (
+          <Empty title={`No ${tab.toLowerCase()} journeys`}>
+            <p>Your confirmed and historical bookings will appear here.</p>
+          </Empty>
+        )}
+    </div>
+  );
+}
+
+function CustomerDetail({
+  id,
+  token,
+  success,
+  onBack,
+}: {
+  id: string;
+  token: string;
+  success: boolean;
+  onBack: () => void;
+}) {
+  const r = useResource<DetailBooking>(`/customer/bookings/${id}`, token);
+  const [error, setError] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const t = setInterval(r.reload, 12000);
+    return () => clearInterval(t);
+  }, [id]);
+
+  if (r.loading && !r.data) return <Loading />;
+  if (r.error) return <ErrorBox message={r.error} retry={r.reload} />;
+  const b = r.data;
+  if (!b) return null;
+
+  return (
+    <div className="page narrow">
+      <button className="text-button" onClick={onBack}>
+        <ChevronLeft size={16} /> Return to bookings
+      </button>
+      {success && (
+        <div className="success-banner">
+          <Check />
+          <h2>Booking Confirmed!</h2>
+          <p>
+            Your journey reference is <strong>#{b.bookingNumber}</strong>. We have dispatched this to our driver fleet.
+          </p>
+        </div>
+      )}
+      <section className="card detail-card">
+        <BookingInfo b={b} />
+        {error && <ErrorBox message={error} />}
+        <div className="actions">
+          <Invoice id={id} token={token} prefix="customer" />
+          <a
+            className="secondary"
+            href={`https://wa.me/?text=${encodeURIComponent(`Miles & Moments Journey #${b.bookingNumber}: ${b.pickup} → ${b.drop} on ${b.date} at ${b.time}. Fare: ${money(b.fare)}`)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Share on WhatsApp
+          </a>
+          <a
+            className="secondary"
+            href={`sms:?body=${encodeURIComponent(`Booking #${b.bookingNumber}: ${b.pickup} to ${b.drop}, ${b.date} ${b.time}`)}`}
+          >
+            Share by SMS
+          </a>
+          {['PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED'].includes(b.status) && (
+            <button className="danger-button" onClick={() => setConfirm(true)}>
+              Cancel booking
+            </button>
+          )}
+        </div>
+      </section>
+      {confirm && (
+        <Modal title="Cancel this reservation?" onClose={() => setConfirm(false)}>
+          <p>
+            Your reservation #{b.bookingNumber} will be cancelled in the dispatch system. No advance payment is required for new bookings. Contact support about any historical payment.
+          </p>
+          <div className="actions">
+            <button className="secondary" onClick={() => setConfirm(false)}>
+              Keep journey
+            </button>
+            <button
+              className="danger-button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await api(`/customer/bookings/${id}/cancel`, { token, method: 'POST' });
+                  setConfirm(false);
+                  r.reload();
+                } catch (e) {
+                  setError((e as Error).message);
+                  setConfirm(false);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? 'Processing cancellation…' : 'Confirm Cancellation'}
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function Profile({ token, logout }: { token: string; logout: () => void }) {
+  const r = useResource<Customer>('/customer/profile', token);
+  const [profile, setProfile] = useState<Customer | null>(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (r.data) setProfile(r.data);
+  }, [r.data]);
+
+  if (!profile) return r.error ? <ErrorBox message={r.error} retry={r.reload} /> : <Loading />;
+
+  return (
+    <div className="page narrow">
+      <p className="eyebrow">YOUR ACCOUNT PREFERENCES</p>
+      <h1>Customer Profile</h1>
+      <form
+        className="card detail-card"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setError('');
+          try {
+            await api('/customer/profile', { method: 'PUT', token, body: profile });
+            setMessage('Profile updated successfully.');
+          } catch (e) {
+            setError((e as Error).message);
+          }
+        }}
+      >
+        {error && <ErrorBox message={error} />}
+        <div className="form-grid">
+          <label>
+            Full Name
+            <input required minLength={2} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+          </label>
+          <label>
+            Contact Mobile Number
+            <input type="tel" pattern="[6-9][0-9]{9}" value={profile.phone} onChange={e=>setProfile({...profile,phone:e.target.value})} />
+          </label>
+          <label>
+            Email Address (Verified)
+            <input type="email" value={profile.email || ''} readOnly />
+          </label>
+          <label>
+            Preferred Communication Language
+            <select value={profile.language} onChange={(e) => setProfile({ ...profile, language: e.target.value })}>
+              {['English', 'Kannada', 'Hindi'].map((v) => (
+                <option key={v}>{v}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <h3>Saved Travel Locations</h3>
+        {profile.addresses.map((a, i) => (
+          <div className="address-row" key={a.id}>
+            <select
+              aria-label="Address label"
+              value={a.label}
+              onChange={(e) =>
+                setProfile({
+                  ...profile,
+                  addresses: profile.addresses.map((v, n) => (n === i ? { ...v, label: e.target.value } : v)),
+                })
+              }
+            >
+              {['Home', 'Work', 'Other'].map((v) => (
+                <option key={v}>{v}</option>
+              ))}
+            </select>
+            <input
+              required
+              minLength={3}
+              aria-label="Address"
+              value={a.address}
+              onChange={(e) =>
+                setProfile({
+                  ...profile,
+                  addresses: profile.addresses.map((v, n) => (n === i ? { ...v, address: e.target.value } : v)),
+                })
+              }
+            />
+            <button
+              type="button"
+              className="text-button"
+              onClick={() =>
+                setProfile({
+                  ...profile,
+                  addresses: profile.addresses.filter((_, n) => n !== i),
+                })
+              }
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="secondary"
+          onClick={() =>
+            setProfile({
+              ...profile,
+              addresses: [...profile.addresses, { id: crypto.randomUUID(), label: 'Home', address: '' }],
+            })
+          }
+        >
+          + Add Saved Address
+        </button>
+        <div className="actions">
+          <button className="primary">Save Changes</button>
+          <button type="button" className="secondary" onClick={logout}>
+            Sign Out
+          </button>
+        </div>
+        {message && <p role="status" className="notice">{message}</p>}
+      </form>
+    </div>
+  );
+}
+
+function DownloadPage({
+  settings,
+  onHome,
+}: {
+  settings?: Settings;
+  onHome: () => void;
+}) {
+  const apkDownloadUrl = '/downloads/customer-app-latest.apk';
+  const apkVersion = settings?.apkVersion || '1.0.0';
+  const apkSize = settings?.apkSize || '24.8 MB';
+
+  return (
+    <div className="page download-page">
+      <div>
+        <span className="security-badge">
+          <ShieldCheck size={14} /> Official Private Release • Verified Android APK
+        </span>
+        <h1>
+          Your journey.<br />
+          Always in your pocket.
+        </h1>
+        <p className="muted">
+          Download our native Android app directly from our secure HTTPS distribution server.
+          Experience fluid animations, direct chauffeur calls, and real-time offline status tracking.
+        </p>
+
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', margin: '24px 0 16px' }}>
+          <a className="primary" href={apkDownloadUrl} download="miles-and-moments-v1.0.0.apk">
+            <Download size={18} /> Download Official Android APK ({apkSize})
+          </a>
+        </div>
+
+        <div className="apk-spec-grid">
+          <div className="apk-spec-item">
+            <strong>Release Version</strong>
+            <span>v{apkVersion} (Stable Production Release)</span>
+          </div>
+          <div className="apk-spec-item">
+            <strong>Package Name</strong>
+            <span>com.milesandmoments.customer</span>
+          </div>
+          <div className="apk-spec-item">
+            <strong>File Size</strong>
+            <span>{apkSize}</span>
+          </div>
+          <div className="apk-spec-item">
+            <strong>OS Requirement</strong>
+            <span>Android 8.0 (Oreo) and above</span>
+          </div>
+        </div>
+
+        <div className="qr-container">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="120" height="120" rx="8" fill="#F8FAFC" />
+            <rect x="10" y="10" width="30" height="30" rx="4" stroke="#0F172A" strokeWidth="4" />
+            <rect x="18" y="18" width="14" height="14" rx="2" fill="#2563EB" />
+            <rect x="80" y="10" width="30" height="30" rx="4" stroke="#0F172A" strokeWidth="4" />
+            <rect x="88" y="18" width="14" height="14" rx="2" fill="#2563EB" />
+            <rect x="10" y="80" width="30" height="30" rx="4" stroke="#0F172A" strokeWidth="4" />
+            <rect x="18" y="88" width="14" height="14" rx="2" fill="#2563EB" />
+            <rect x="52" y="16" width="16" height="6" fill="#0F172A" />
+            <rect x="52" y="28" width="8" height="12" fill="#0F172A" />
+            <rect x="16" y="52" width="14" height="8" fill="#0F172A" />
+            <rect x="36" y="52" width="20" height="6" fill="#0F172A" />
+            <rect x="64" y="52" width="18" height="18" fill="#2563EB" />
+            <rect x="90" y="52" width="18" height="6" fill="#0F172A" />
+            <rect x="52" y="80" width="12" height="16" fill="#0F172A" />
+            <rect x="72" y="80" width="14" height="8" fill="#0F172A" />
+            <rect x="92" y="74" width="16" height="14" fill="#0F172A" />
+            <rect x="72" y="96" width="36" height="12" fill="#2563EB" />
+          </svg>
+          <small><QrCode size={12} style={{ marginRight: 4 }} /> Point mobile camera to download APK</small>
+        </div>
+
+        <h3>Quick 3-Step Installation</h3>
+        <ol className="install-steps">
+          <li>Download the APK file to your Android phone from the secure link above.</li>
+          <li>When Android displays the standard browser security warning, tap &quot;Settings&quot; and enable &quot;Allow installation from this source&quot;.</li>
+          <li>Tap the downloaded file and choose &quot;Install&quot;. Open the app and log in with your 10-digit mobile number.</li>
+        </ol>
+
+        <p className="muted">
+          Note: You are never required to install the Android app. Our complete booking experience, trip tracking, and GST invoice download are always accessible right here on our website.
+        </p>
+        <button className="secondary" onClick={onHome}>
+          Continue booking on website <ArrowRight size={16} />
+        </button>
+      </div>
+
+      <div className="download-card-prod">
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div className="avatar" style={{ width: 64, height: 64, margin: '0 auto 12px', background: '#eff6ff', color: 'var(--blue)' }}>
+            <Smartphone size={32} />
+          </div>
+          <h2 style={{ fontSize: 24, margin: '6px 0' }}>Native Android APK</h2>
+          <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontSize: 11, padding: '4px 10px' }}>
+            Production Build Signed
+          </span>
+        </div>
+
+        <div className="card" style={{ padding: 20, marginBottom: 20, background: '#f8fafc' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <ShieldCheck size={20} color="#16a34a" />
+            <div>
+              <strong style={{ fontSize: 13 }}>Malware & Virus Free</strong>
+              <small style={{ display: 'block', color: 'var(--muted)' }}>Compiled directly from verified source</small>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <Check size={20} color="#2563eb" />
+            <div>
+              <strong style={{ fontSize: 13 }}>Real-time Database Sync</strong>
+              <small style={{ display: 'block', color: 'var(--muted)' }}>Same backend and booking IDs across Web & App</small>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <RouteIcon size={20} color="#f97316" />
+            <div>
+              <strong style={{ fontSize: 13 }}>Offline Chauffeur Contacts</strong>
+              <small style={{ display: 'block', color: 'var(--muted)' }}>Direct phone & WhatsApp dialer support</small>
+            </div>
+          </div>
+        </div>
+
+        <a className="primary full" href={apkDownloadUrl} download="miles-and-moments-v1.0.0.apk">
+          <Download size={18} /> Download APK (24.8 MB)
+        </a>
+      </div>
+    </div>
+  );
+}

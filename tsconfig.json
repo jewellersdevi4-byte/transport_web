@@ -1,0 +1,76 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@transport/shared-types": [
+        "./packages/shared-types/src/index.ts"
+      ],
+      "@transport/shared-types/*": [
+        "./packages/shared-types/src/*"
+      ],
+      "@transport/shared-utils": [
+        "./packages/shared-utils/src/index.ts"
+      ],
+      "@transport/shared-utils/*": [
+        "./packages/shared-utils/src/*"
+      ],
+      "@transport/validation": [
+        "./packages/validation/src/index.ts"
+      ],
+      "@transport/validation/*": [
+        "./packages/validation/src/*"
+      ],
+      "@transport/api-contracts": [
+        "./packages/api-contracts/src/index.ts"
+      ],
+      "@transport/api-contracts/*": [
+        "./packages/api-contracts/src/*"
+      ],
+      "@transport/api-client": [
+        "./packages/api-client/src/index.ts"
+      ],
+      "@transport/api-client/*": [
+        "./packages/api-client/src/*"
+      ],
+      "@transport/shared-ui": [
+        "./packages/shared-ui/src/index.ts"
+      ],
+      "@transport/shared-ui/*": [
+        "./packages/shared-ui/src/*"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "packages/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/.next/**",
+    "apps/customer-app/**",
+    "apps/admin-app/**",
+    "apps/**/android/**"
+  ]
+}

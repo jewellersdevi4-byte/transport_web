@@ -1,0 +1,17 @@
+{
+  "name": "@transport/shared-ui",
+  "version": "1.0.0",
+  "main": "./src/common.tsx",
+  "types": "./src/common.tsx",
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}

@@ -1,0 +1,1537 @@
+'use client';
+import { useState, useEffect } from 'react';
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Users,
+  Car,
+  Tag,
+  ChartNoAxesCombined,
+  Bell,
+  Settings as SettingsIcon,
+  Route as RouteIcon,
+  Search,
+  ArrowUpRight,
+  ArrowRight,
+  Plus,
+  LogOut,
+  Menu,
+  Check,
+  Clock,
+  IndianRupee,
+  Download,
+  Smartphone,
+  X,
+  Phone,
+  Database,
+  RefreshCw,
+  FileText
+} from 'lucide-react';
+import type { Booking, Driver, Vehicle, Pricing, Route, Notice, Settings, Customer, Store } from '../../shared-types/src/index';
+import { transitions } from '../../shared-utils/src/index';
+import {
+  Auth,
+  Badge,
+  BookingInfo,
+  Empty,
+  ErrorBox,
+  Invoice,
+  Loading,
+  Modal,
+  api,
+  money,
+  label,
+  useResource,
+  useSession,
+  type DetailBooking
+} from './common';
+
+const navigation = [
+  ['Dashboard', LayoutDashboard],
+  ['Bookings', CalendarDays],
+  ['Drivers', Users],
+  ['Vehicles', Car],
+  ['Pricing', Tag],
+  ['Reports', ChartNoAxesCombined],
+  ['Notifications', Bell],
+  ['Settings', SettingsIcon],
+] as const;
+
+export default function AdminApp() {
+  const session = useSession('admin');
+  const [page, setPage] = useState('Dashboard');
+  const [booking, setBooking] = useState('');
+  const [menu, setMenu] = useState(false);
+  const [version, setVersion] = useState(0);
+
+  if (!session.ready) return <Loading />;
+  if (!session.token) {
+    return (
+      <div className="admin-login">
+        <div className="login-story">
+          <div className="brand">
+            <RouteIcon /> miles&moments <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', fontWeight: 800 }}>DISPATCH CONSOLE</span>
+          </div>
+          <p className="eyebrow">CENTRAL OPERATIONS PORTAL</p>
+          <h1>Real-time fleet.<br />Every mile in control.</h1>
+          <p>
+            Connected directly to PostgreSQL database.<br />
+            Monitor bookings, dispatch chauffeurs, track trip transitions, and manage collections.
+          </p>
+        </div>
+        <Auth admin onLogin={session.login} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-shell">
+      <aside className={`sidebar ${menu ? 'open' : ''}`}>
+        <a className="brand" href="/admin" onClick={(e) => { e.preventDefault(); setPage('Dashboard'); setBooking(''); }}>
+          <span className="brand-icon"><RouteIcon /></span>
+          <span>miles&moments<small>OPERATIONS HUB</small></span>
+        </a>
+        <p className="nav-label">WORKSPACE</p>
+        <nav>
+          {navigation.map(([name, Icon]) => (
+            <button
+              className={page === name && !booking ? 'active' : ''}
+              key={name}
+              onClick={() => {
+                setPage(name);
+                setBooking('');
+                setMenu(false);
+              }}
+            >
+              <Icon size={18} />
+              {name}
+              {name === 'Bookings' && <span className="nav-dot" />}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="workspace-mark">
+            <span className="db-badge" style={{ marginBottom: 6 }}>
+              <span className="db-dot" /> PostgreSQL Connected
+            </span>
+            <strong>transport_db</strong>
+            <small>Port 5432 · Advisory locking</small>
+          </div>
+          <button onClick={session.logout}>
+            <LogOut size={16} /> Sign out
+          </button>
+        </div>
+      </aside>
+
+      <div className="admin-main">
+        <header className="admin-header">
+          <button className="mobile icon-button" onClick={() => setMenu(!menu)} aria-label="Toggle navigation">
+            <Menu />
+          </button>
+          <span className="muted">
+            Workspace <span className="breadcrumb">/</span> <strong>{booking ? 'Booking Details' : page}</strong>
+          </span>
+
+          <div className="header-right">
+            <span className="db-badge">
+              <span className="db-dot" /> PostgreSQL Active
+            </span>
+            <button className="icon-button" aria-label="Notifications" onClick={() => setPage('Notifications')}>
+              <Bell size={18} />
+            </button>
+            <span className="avatar small-avatar">OP</span>
+            <span className="desktop">
+              Operations Lead<small>Bengaluru Dispatch</small>
+            </span>
+          </div>
+        </header>
+
+        <main className="admin-content" key={version}>
+          {booking ? (
+            <AdminBooking
+              id={booking}
+              token={session.token}
+              onBack={() => {
+                setBooking('');
+                setVersion((v) => v + 1);
+              }}
+            />
+          ) : page === 'Dashboard' ? (
+            <Dashboard token={session.token} open={setBooking} goBookings={() => setPage('Bookings')} />
+          ) : page === 'Bookings' ? (
+            <Bookings token={session.token} open={setBooking} />
+          ) : page === 'Drivers' || page === 'Vehicles' ? (
+            <Fleet token={session.token} kind={page} />
+          ) : page === 'Pricing' ? (
+            <PricingPage token={session.token} />
+          ) : page === 'Reports' ? (
+            <Reports token={session.token} />
+          ) : page === 'Notifications' ? (
+            <Notifications token={session.token} />
+          ) : (
+            <SettingsPage token={session.token} />
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function Heading({
+  eyebrow,
+  title,
+  description,
+  action,
+}: {
+  eyebrow?: string;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="page-heading">
+      <div>
+        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+        <h1>{title}</h1>
+        <p className="muted">{description}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function Stat({
+  title,
+  value,
+  sub,
+  icon: Icon = CalendarDays,
+  color = 'blue',
+}: {
+  title: string;
+  value: string | number;
+  sub: string;
+  icon?: typeof CalendarDays;
+  color?: string;
+}) {
+  return (
+    <div className="stat-card card">
+      <div className="section-title">
+        <span>{title}</span>
+        <span className={`stat-icon ${color}`}>
+          <Icon size={19} />
+        </span>
+      </div>
+      <strong>{value}</strong>
+      <small>{sub}</small>
+    </div>
+  );
+}
+
+function Dashboard({
+  token,
+  open,
+  goBookings,
+}: {
+  token: string;
+  open: (id: string) => void;
+  goBookings: () => void;
+}) {
+  const r = useResource<{
+    bookings: Booking[];
+    notifications: Notice[];
+    drivers: Driver[];
+    vehicles: Vehicle[];
+  }>('/admin/dashboard', token);
+
+  if (r.loading) return <Loading />;
+  if (r.error || !r.data) return <ErrorBox message={r.error} retry={r.reload} />;
+  const d = r.data;
+  const pending = d.bookings.filter((b) => b.status === 'CONFIRMED' && !b.driverId);
+  const activeTrips = d.bookings.filter((b) => b.status === 'TRIP_STARTED' || b.status === 'DRIVER_ASSIGNED');
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const revenue = (days: number) =>
+    d.bookings
+      .filter((b) => b.paymentStatus === 'PAID' && new Date(b.createdAt).getTime() >= Date.now() - days * 86400000)
+      .reduce((s, b) => s + b.fare, 0);
+
+  return (
+    <>
+      <Heading
+        eyebrow="LIVE DISPATCH METRICS"
+        title="Operations Dashboard"
+        description="Real-time booking dispatch, chauffeur availability, and revenue telemetry."
+        action={
+          <span className="date-chip">
+            <CalendarDays size={16} />
+            {new Date().toLocaleDateString('en-IN', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </span>
+        }
+      />
+
+      <div className="stats-grid">
+        <Stat
+          title="Today's bookings"
+          value={d.bookings.filter((b) => b.date === today).length}
+          sub={`${d.bookings.length} total database records`}
+        />
+        <Stat
+          title="Pending dispatch"
+          value={pending.length}
+          sub="Requires chauffeur assignment"
+          icon={Users}
+          color="orange"
+        />
+        <Stat
+          title="Trips on road"
+          value={activeTrips.length}
+          sub={`${d.drivers.filter((dr) => dr.status === 'Available').length} drivers currently available`}
+          icon={Car}
+          color="green"
+        />
+        <Stat
+          title="Today's collections"
+          value={money(revenue(1))}
+          sub="Verified online & cash bookings"
+          icon={IndianRupee}
+        />
+      </div>
+
+      <div className="dashboard-grid">
+        <section className="card panel">
+          <div className="section-title">
+            <div>
+              <h2>Pending Chauffeur Assignments <span className="count">{pending.length}</span></h2>
+              <p className="muted">Bookings confirmed by customer awaiting driver dispatch.</p>
+            </div>
+            {pending.length > 0 && <span className="orange-label">DISPATCH NEEDED</span>}
+          </div>
+
+          {pending.length ? (
+            pending.slice(0, 5).map((b) => (
+              <div className="assignment-row" key={b.id}>
+                <span className="vehicle-icon">
+                  <Car size={22} />
+                </span>
+                <div>
+                  <strong>{b.pickup} <ArrowRight size={14} /> {b.drop}</strong>
+                  <p className="muted">
+                    #{b.bookingNumber} · {b.date} · {b.time} · {b.vehicleType} · {money(b.fare)}
+                  </p>
+                </div>
+                <button className="primary small" onClick={() => open(b.id)}>
+                  Assign Chauffeur <ArrowUpRight size={14} />
+                </button>
+              </div>
+            ))
+          ) : (
+            <Empty title="Dispatch Queue Clear">
+              <p>Every active booking has been assigned a driver.</p>
+            </Empty>
+          )}
+        </section>
+
+        <section className="card panel fleet-overview">
+          <h2>Fleet Status Overview</h2>
+          <div className="fleet-ring">
+            <div>
+              <strong>{d.vehicles.length}</strong>
+              <small>total vehicles</small>
+            </div>
+          </div>
+          {['Available', 'On Trip', 'Maintenance', 'Inactive'].map((s, i) => (
+            <div className="section-title fleet-legend" key={s}>
+              <span>
+                <i style={{ background: ['#2563eb', '#10b981', '#f97316', '#94a3b8'][i] }} />
+                {s}
+              </span>
+              <strong>{d.vehicles.filter((v) => v.status === s).length}</strong>
+            </div>
+          ))}
+        </section>
+      </div>
+
+      <div className="grid-two">
+        <section className="card panel">
+          <div className="section-title">
+            <h2>Revenue Velocity</h2>
+            <Badge value="INR (₹)" />
+          </div>
+          <RevenueChart bookings={d.bookings} />
+          <div className="section-title" style={{ marginTop: 12 }}>
+            <span>Last 7 Days: <strong>{money(revenue(7))}</strong></span>
+            <span>Last 30 Days: <strong>{money(revenue(30))}</strong></span>
+          </div>
+        </section>
+
+        <section className="card panel">
+          <h2>Live Dispatch Alerts</h2>
+          <div className="mini-stats">
+            <div>
+              <strong>{d.bookings.filter((b) => b.status === 'CONFIRMED').length}</strong>
+              <span>Confirmed</span>
+            </div>
+            <div>
+              <strong>{d.bookings.filter((b) => b.status === 'COMPLETED').length}</strong>
+              <span>Completed</span>
+            </div>
+          </div>
+          {d.notifications.slice(0, 4).map((n) => (
+            <div className="notification-row" key={n.id}>
+              <span className="pulse-icon">
+                <Bell size={16} />
+              </span>
+              <div>
+                <p>{n.message}</p>
+                <small className="muted">
+                  {new Date(n.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                </small>
+              </div>
+            </div>
+          ))}
+          {!d.notifications.length && <p className="muted">No recent dispatch alerts.</p>}
+        </section>
+      </div>
+
+      <section className="card panel">
+        <div className="section-title">
+          <h2>Recent Bookings (PostgreSQL)</h2>
+          <button className="text-button" onClick={goBookings}>
+            View all bookings <ArrowRight size={16} />
+          </button>
+        </div>
+        <BookingTable bookings={d.bookings.slice(0, 6)} open={open} />
+      </section>
+    </>
+  );
+}
+
+function RevenueChart({ bookings }: { bookings: Booking[] }) {
+  const series = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(Date.now() - (6 - i) * 86400000);
+    const date = day.toISOString().slice(0, 10);
+    return {
+      label: day.toLocaleDateString('en-IN', { weekday: 'short' }),
+      value: bookings
+        .filter((b) => b.createdAt.slice(0, 10) === date && b.paymentStatus === 'PAID')
+        .reduce((a, b) => a + b.fare, 0),
+    };
+  });
+  const max = Math.max(1, ...series.map((s) => s.value));
+
+  return (
+    <div className="bar-chart" role="img" aria-label="Collections over the last seven days">
+      {series.map((s, i) => (
+        <div key={i}>
+          <small>{money(s.value)}</small>
+          <span style={{ height: `${Math.max(4, (s.value / max) * 125)}px` }} />
+          <small>{s.label}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BookingTable({ bookings, open }: { bookings: Booking[]; open: (id: string) => void }) {
+  return bookings.length ? (
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            {['Booking ID', 'Customer / Phone', 'Route', 'Date & Time', 'Vehicle', 'Fare & Payment', 'Chauffeur', 'Status', ''].map(
+              (h, i) => (
+                <th key={i}>{h}</th>
+              )
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {bookings.map((b) => (
+            <tr key={b.id}>
+              <td>
+                <button className="table-link" onClick={() => open(b.id)}>
+                  #{b.bookingNumber}
+                </button>
+              </td>
+              <td>
+                <strong>{b.name}</strong>
+                <small>{b.phone}</small>
+              </td>
+              <td className="route-cell">
+                {b.pickup}
+                <small>→ {b.drop}</small>
+              </td>
+              <td>
+                {b.date}
+                <small>{b.time}</small>
+              </td>
+              <td>{b.vehicleType}</td>
+              <td>
+                <strong>{money(b.fare)}</strong>
+                <Badge value={b.paymentStatus} />
+              </td>
+              <td>
+                {b.driverId ? <Badge value={b.assignment} /> : <span className="muted">Unassigned</span>}
+              </td>
+              <td>
+                <Badge value={b.status} />
+              </td>
+              <td>
+                <button className="icon-button" aria-label={`View ${b.bookingNumber}`} onClick={() => open(b.id)}>
+                  <ArrowUpRight size={18} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  ) : (
+    <Empty title="No bookings matched the criteria">
+      <p>Adjust your search filters.</p>
+    </Empty>
+  );
+}
+
+function Bookings({ token, open }: { token: string; open: (id: string) => void }) {
+  const [filters, setFilters] = useState({ search: '', date: '', status: '', vehicle: '', payment: '', driver: '' });
+  const r = useResource<Booking[]>(`/admin/bookings?${new URLSearchParams(filters)}`, token);
+  const drivers = useResource<Driver[]>('/admin/drivers', token);
+
+  return (
+    <>
+      <Heading
+        title="Fleet Bookings Registry"
+        description="Filter, inspect, and dispatch trips with direct relational database consistency."
+      />
+      <section className="card panel">
+        <div className="filters">
+          <label className="search-field">
+            <Search size={16} />
+            <input
+              aria-label="Search bookings"
+              placeholder="Search by ID, customer name, mobile number…"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            />
+          </label>
+          <input
+            aria-label="Pickup date"
+            type="date"
+            value={filters.date}
+            onChange={(e) => setFilters({ ...filters, date: e.target.value })}
+          />
+          {(['status', 'vehicle', 'payment'] as const).map((f) => (
+            <select
+              aria-label={f}
+              key={f}
+              value={filters[f]}
+              onChange={(e) => setFilters({ ...filters, [f]: e.target.value })}
+            >
+              <option value="">{f === 'status' ? 'All Statuses' : f === 'vehicle' ? 'All Vehicles' : 'All Payments'}</option>
+              {(f === 'status'
+                ? Object.keys(transitions)
+                : f === 'vehicle'
+                ? ['Sedan', 'SUV', 'Tempo Traveller']
+                : ['PAID', 'PENDING', 'FAILED', 'CASH']
+              ).map((s) => (
+                <option key={s} value={s}>
+                  {label(s)}
+                </option>
+              ))}
+            </select>
+          ))}
+          <select
+            aria-label="Driver"
+            value={filters.driver}
+            onChange={(e) => setFilters({ ...filters, driver: e.target.value })}
+          >
+            <option value="">All Chauffeurs</option>
+            {drivers.data?.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name} ({d.status})
+              </option>
+            ))}
+          </select>
+          <button
+            className="text-button"
+            onClick={() => setFilters({ search: '', date: '', status: '', vehicle: '', payment: '', driver: '' })}
+          >
+            Clear Filters
+          </button>
+        </div>
+
+        {r.loading ? <Loading /> : r.error ? <ErrorBox message={r.error} retry={r.reload} /> : <BookingTable bookings={r.data || []} open={open} />}
+      </section>
+    </>
+  );
+}
+
+function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack: () => void }) {
+  const r = useResource<DetailBooking>(`/admin/bookings/${id}`, token);
+  const drivers = useResource<Driver[]>('/admin/drivers', token);
+  const vehicles = useResource<Vehicle[]>('/admin/vehicles', token);
+  const [assign, setAssign] = useState(false);
+  const [selected, setSelected] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState('');
+  const [message, setMessage] = useState('');
+  const [notifyOpen, setNotifyOpen] = useState(false);
+
+  async function action(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST') {
+    setBusy(true);
+    setError('');
+    try {
+      await api(path, { token, method, body });
+      r.reload();
+      setAssign(false);
+      setConfirm('');
+      setNotifyOpen(false);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (r.loading && !r.data) return <Loading />;
+  if (r.error || !r.data) return <ErrorBox message={r.error} retry={r.reload} />;
+  const b = r.data;
+
+  return (
+    <>
+      <button className="text-button" onClick={onBack}>
+        ← Return to Bookings
+      </button>
+      <Heading
+        title={`Booking #${b.bookingNumber}`}
+        description="Comprehensive dispatch record, driver allocation, and status progression."
+        action={<Badge value={b.status} />}
+      />
+
+      {error && <ErrorBox message={error} />}
+
+      <div className="detail-layout">
+        <section className="card detail-card">
+          <BookingInfo b={b} />
+          <div style={{ marginTop: 24, borderTop: '1px solid #e2e8f0', paddingTop: 20 }}>
+            <Invoice id={id} token={token} prefix="admin" />
+          </div>
+        </section>
+
+        <aside className="card panel action-panel">
+          <h2>Dispatch Operations</h2>
+
+          {b.status === 'CONFIRMED' && (
+            <button className="primary full" onClick={() => setAssign(true)}>
+              <Users size={16} /> Assign Available Driver
+            </button>
+          )}
+
+          {b.status === 'DRIVER_ASSIGNED' && b.assignment === 'ACCEPTED' && (
+            <button
+              className="primary full"
+              style={{ background: '#7c3aed' }}
+              disabled={busy}
+              onClick={() => action(`/admin/bookings/${id}/status`, { status: 'TRIP_STARTED' }, 'PUT')}
+            >
+              <Car size={16} /> Start Trip (Chauffeur Picked Up)
+            </button>
+          )}
+
+          {b.status === 'TRIP_STARTED' && (
+            <button
+              className="primary full"
+              style={{ background: '#10b981' }}
+              disabled={busy}
+              onClick={() => action(`/admin/bookings/${id}/status`, { status: 'COMPLETED' }, 'PUT')}
+            >
+              <Check size={16} /> Complete Trip (Passenger Dropped)
+            </button>
+          )}
+
+          {transitions[b.status]
+            ?.filter((s) => !['DRIVER_ASSIGNED', 'CONFIRMED', 'TRIP_STARTED', 'COMPLETED'].includes(s))
+            .map((s) => (
+              <button
+                key={s}
+                className={s === 'CANCELLED' ? 'danger-button full' : 'secondary full'}
+                onClick={() => setConfirm(s)}
+              >
+                {s === 'CANCELLED' ? 'Cancel Booking' : `Advance to ${label(s)}`}
+              </button>
+            ))}
+
+          <button
+            className="secondary full"
+            onClick={() => {
+              setNotifyOpen(true);
+              setMessage(`Your booking #${b.bookingNumber} is currently: ${label(b.status)}.`);
+            }}
+          >
+            <Bell size={16} /> Send SMS / WhatsApp Alert
+          </button>
+
+          <hr />
+
+          <h3>Driver Response Channel</h3>
+          <Badge value={b.assignment} />
+
+          {b.assignment === 'ASSIGNED' && (
+            <div style={{ marginTop: 12, padding: 14, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10 }}>
+              <strong style={{ fontSize: 12, display: 'block', marginBottom: 4, color: '#166534' }}>
+                WhatsApp Dispatch Simulation:
+              </strong>
+              <small style={{ color: '#15803d', display: 'block', marginBottom: 10 }}>
+                Chauffeur was notified via WhatsApp Business API.
+              </small>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="primary small"
+                  style={{ background: '#16a34a', flex: 1 }}
+                  disabled={busy}
+                  onClick={() => action('/driver/assignment-response', { bookingId: id, response: 'YES' })}
+                >
+                  Reply YES (Accept)
+                </button>
+                <button
+                  className="secondary small"
+                  style={{ color: '#dc2626', flex: 1 }}
+                  disabled={busy}
+                  onClick={() => action('/driver/assignment-response', { bookingId: id, response: 'NO' })}
+                >
+                  Reply NO (Decline)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {b.assignment === 'DECLINED' && (
+            <p className="error" style={{ fontSize: 11 }}>
+              Driver declined this assignment. Please choose another available driver.
+            </p>
+          )}
+
+          {b.assignment === 'ACCEPTED' && (
+            <p style={{ color: '#15803d', fontSize: 12, fontWeight: 600, marginTop: 8 }}>
+              ✓ Chauffeur accepted the assignment via WhatsApp.
+            </p>
+          )}
+        </aside>
+      </div>
+
+      {assign && (
+        <Modal title={`Assign Chauffeur · #${b.bookingNumber}`} onClose={() => setAssign(false)}>
+          <p className="muted">
+            Displaying active drivers with vehicles matching the requested type (<strong>{b.vehicleType}</strong>).
+          </p>
+
+          {drivers.data
+            ?.filter(
+              (d) =>
+                d.status === 'Available' &&
+                vehicles.data?.find((v) => v.id === d.vehicleId)?.type === b.vehicleType
+            )
+            .map((d) => (
+              <button
+                className={`driver-choice ${selected === d.id ? 'selected' : ''}`}
+                key={d.id}
+                onClick={() => setSelected(d.id)}
+              >
+                <span className="avatar">{d.name[0]}</span>
+                <div>
+                  <strong>{d.name}</strong>
+                  <p>{d.phone} · ★ {d.rating} ({d.trips} trips)</p>
+                  <small>Vehicle: {vehicles.data?.find((v) => v.id === d.vehicleId)?.model} ({vehicles.data?.find((v) => v.id === d.vehicleId)?.number})</small>
+                </div>
+                <Badge value={d.status} />
+              </button>
+            ))}
+
+          {drivers.data?.filter(
+            (d) =>
+              d.status === 'Available' &&
+              vehicles.data?.find((v) => v.id === d.vehicleId)?.type === b.vehicleType
+          ).length === 0 && (
+            <Empty title="No matching drivers available">
+              <p>All drivers for {b.vehicleType} are currently on trip or inactive.</p>
+            </Empty>
+          )}
+
+          {error && <ErrorBox message={error} />}
+
+          <button
+            className="primary full"
+            disabled={!selected || busy}
+            onClick={() => action(`/admin/bookings/${id}/assign-driver`, { driverId: selected })}
+            style={{ marginTop: 16 }}
+          >
+            {busy ? 'Assigning…' : 'Confirm Chauffeur Assignment'}
+          </button>
+        </Modal>
+      )}
+
+      {confirm && (
+        <Modal title={`Confirm status change to ${label(confirm)}?`} onClose={() => setConfirm('')}>
+          <p>This action will persist directly to the PostgreSQL database and dispatch a customer notification.</p>
+          {error && <ErrorBox message={error} />}
+          <div className="actions">
+            <button className="secondary" onClick={() => setConfirm('')}>
+              Cancel
+            </button>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                confirm === 'CANCELLED'
+                  ? action(`/admin/bookings/${id}/cancel`, {})
+                  : action(`/admin/bookings/${id}/status`, { status: confirm }, 'PUT')
+              }
+            >
+              Confirm {label(confirm)}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {notifyOpen && (
+        <Modal title="Send Message to Customer" onClose={() => setNotifyOpen(false)}>
+          <label>
+            Message Content
+            <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} />
+          </label>
+          <button
+            className="primary"
+            disabled={busy || !message}
+            onClick={() =>
+              action('/admin/notifications', {
+                recipientType: 'customer',
+                recipientId: b.customerId,
+                channel: 'SMS',
+                template: 'Dispatch Notice',
+                message,
+              })
+            }
+          >
+            Send Message
+          </button>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function Fleet({ token, kind }: { token: string; kind: 'Drivers' | 'Vehicles' }) {
+  const resource = kind.toLowerCase();
+  const r = useResource<(Driver | Vehicle)[]>(`/admin/${resource}`, token);
+  const vehicles = useResource<Vehicle[]>('/admin/vehicles', token);
+  const [query, setQuery] = useState('');
+  const [edit, setEdit] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const isDriver = kind === 'Drivers';
+  const fields = isDriver
+    ? ['name', 'phone', 'license', 'vehicleId', 'status', 'rating', 'trips']
+    : ['type', 'number', 'model', 'capacity', 'ac', 'status'];
+
+  const defaults = isDriver
+    ? { name: '', phone: '', license: '', vehicleId: '', status: 'Available', rating: 5, trips: 0 }
+    : { type: 'Sedan', number: '', model: '', capacity: 4, ac: true, status: 'Available' };
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/admin/${resource}${edit?.id ? `/${edit.id}` : ''}`, {
+        method: edit?.id ? 'PUT' : 'POST',
+        token,
+        body: edit,
+      });
+      setEdit(null);
+      r.reload();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Heading
+        title={isDriver ? 'Chauffeurs & Drivers' : 'Fleet Vehicles'}
+        description={
+          isDriver
+            ? 'Manage drivers, mobile numbers, and vehicle bindings.'
+            : 'Maintain vehicle registration, air conditioning, and operational states.'
+        }
+        action={
+          <button
+            className="primary"
+            onClick={() => {
+              setEdit(defaults);
+              setError('');
+            }}
+          >
+            <Plus size={16} /> Add {isDriver ? 'Driver' : 'Vehicle'}
+          </button>
+        }
+      />
+
+      <div className="filters">
+        <label className="search-field">
+          <Search size={16} />
+          <input
+            aria-label={`Search ${resource}`}
+            placeholder={`Search ${resource}…`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+      </div>
+
+      {r.loading ? (
+        <Loading />
+      ) : r.error ? (
+        <ErrorBox message={r.error} retry={r.reload} />
+      ) : (
+        <div className="grid-three">
+          {r.data
+            ?.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()))
+            .map((item) => (
+              <article key={item.id} className="card fleet-card">
+                <div className="section-title">
+                  <div className={isDriver ? 'avatar' : 'vehicle-icon'}>
+                    {isDriver ? (item as Driver).name[0] : <Car size={26} />}
+                  </div>
+                  <Badge value={item.status} />
+                </div>
+                <h2>{isDriver ? (item as Driver).name : (item as Vehicle).model}</h2>
+                {isDriver ? (
+                  <>
+                    <p className="muted">{(item as Driver).phone}</p>
+                    <p>
+                      Assigned: {vehicles.data?.find((v) => v.id === (item as Driver).vehicleId)?.number || 'None'}
+                    </p>
+                    <p>★ {(item as Driver).rating} · {(item as Driver).trips} completed trips</p>
+                    <small className="muted">License: {(item as Driver).license}</small>
+                  </>
+                ) : (
+                  <>
+                    <p><strong>{(item as Vehicle).number}</strong></p>
+                    <p className="muted">
+                      {(item as Vehicle).type} · {(item as Vehicle).capacity} seats · {(item as Vehicle).ac ? 'AC' : 'Non-AC'}
+                    </p>
+                  </>
+                )}
+                <div className="actions">
+                  <button className="secondary" onClick={() => { setEdit({ ...item }); setError(''); }}>
+                    Edit Record
+                  </button>
+                </div>
+              </article>
+            ))}
+        </div>
+      )}
+
+      {edit && (
+        <Modal title={`${edit.id ? 'Edit' : 'Add'} ${isDriver ? 'Driver' : 'Vehicle'}`} onClose={() => setEdit(null)}>
+          <form onSubmit={save}>
+            {error && <ErrorBox message={error} />}
+            <div className="form-grid">
+              {fields.map((f) => (
+                <label key={f}>
+                  {label(f.replace(/([A-Z])/g, ' $1'))}
+                  {f === 'vehicleId' ? (
+                    <select required value={String(edit[f] || '')} onChange={(e) => setEdit({ ...edit, [f]: e.target.value })}>
+                      <option value="">Select vehicle</option>
+                      {vehicles.data?.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.number} · {v.model} ({v.type})
+                        </option>
+                      ))}
+                    </select>
+                  ) : f === 'status' || f === 'type' || f === 'ac' ? (
+                    <select
+                      value={String(edit[f])}
+                      onChange={(e) => setEdit({ ...edit, [f]: f === 'ac' ? e.target.value === 'true' : e.target.value })}
+                    >
+                      {(f === 'status'
+                        ? isDriver
+                          ? ['Available', 'On Trip', 'Inactive']
+                          : ['Available', 'On Trip', 'Maintenance', 'Inactive']
+                        : f === 'type'
+                        ? ['Sedan', 'SUV', 'Tempo Traveller']
+                        : ['true', 'false']
+                      ).map((s) => (
+                        <option key={s} value={s}>
+                          {f === 'ac' ? (s === 'true' ? 'AC' : 'Non-AC') : s}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      required
+                      type={['capacity', 'rating', 'trips'].includes(f) ? 'number' : 'text'}
+                      step={f === 'rating' ? 0.1 : 1}
+                      value={String(edit[f] ?? '')}
+                      onChange={(e) =>
+                        setEdit({
+                          ...edit,
+                          [f]: ['capacity', 'rating', 'trips'].includes(f) ? Number(e.target.value) : e.target.value,
+                        })
+                      }
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+            <button disabled={busy} className="primary" style={{ marginTop: 16 }}>
+              {busy ? 'Saving to Database…' : 'Save Changes'}
+            </button>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function PricingPage({ token }: { token: string }) {
+  const r = useResource<Pricing[]>('/admin/pricing', token);
+  const routes = useResource<Route[]>('/admin/routes', token);
+  const [pricing, setPricing] = useState<Pricing[]>([]);
+  const [edit, setEdit] = useState<Route | null>(null);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (r.data) setPricing(r.data);
+  }, [r.data]);
+
+  return (
+    <>
+      <Heading
+        title="Fare Structure & Fixed Routes"
+        description="Configure base rates, minimum fares, and surge multiplier."
+      />
+      {error && <ErrorBox message={error} />}
+      {message && <p className="notice">{message}</p>}
+
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          try {
+            await api('/admin/pricing', { token, method: 'PUT', body: pricing });
+            setMessage('Pricing rates saved to database.');
+            setError('');
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <div className="grid-three">
+          {pricing.map((p, i) => (
+            <div className="card panel" key={p.vehicleType}>
+              <span className="vehicle-icon"><Car /></span>
+              <h2>{p.vehicleType}</h2>
+              {(['perKm', 'minimum', 'surge'] as const).map((f) => (
+                <label key={f}>
+                  {f === 'perKm' ? 'Fare per km (₹)' : f === 'minimum' ? 'Minimum fare (₹)' : 'Surge Multiplier'}
+                  <input
+                    required
+                    type="number"
+                    min={f === 'surge' ? 1 : 0.01}
+                    max={f === 'surge' ? 5 : undefined}
+                    step="0.01"
+                    value={p[f]}
+                    onChange={(e) =>
+                      setPricing(
+                        pricing.map((v, n) => (n === i ? { ...v, [f]: Number(e.target.value) } : v))
+                      )
+                    }
+                  />
+                </label>
+              ))}
+              <button
+                type="button"
+                className="text-button"
+                onClick={() =>
+                  setPricing(pricing.map((v, n) => (n === i ? { ...v, surge: v.surge > 1 ? 1 : 1.25 } : v)))
+                }
+              >
+                {p.surge > 1 ? 'Disable Surge' : 'Set 1.25× Peak Surge'}
+              </button>
+            </div>
+          ))}
+        </div>
+        <button className="primary spaced" disabled={busy || !pricing.length}>
+          {busy ? 'Saving Rates…' : 'Save Pricing Rates'}
+        </button>
+      </form>
+
+      <section className="card panel">
+        <div className="section-title">
+          <div>
+            <h2>Popular Fixed Intercity Routes</h2>
+            <p className="muted">Direct fixed fares for common outstation pairings.</p>
+          </div>
+          <button className="secondary" onClick={() => setEdit({ id: '', origin: '', destination: '', distance: 35, fixedPrice: 500, active: true })}>
+            <Plus size={16} /> Add Route
+          </button>
+        </div>
+        {routes.data?.map((route) => (
+          <div className="assignment-row" key={route.id}>
+            <div>
+              <h3>{route.origin} → {route.destination}</h3>
+              <p>{route.distance} km · {money(route.fixedPrice)} · {route.active ? 'Active' : 'Inactive'}</p>
+            </div>
+            <button className="secondary" onClick={() => setEdit(route)}>
+              Edit
+            </button>
+          </div>
+        ))}
+      </section>
+
+      {edit && (
+        <Modal title={edit.id ? 'Edit Fixed Route' : 'Create Fixed Route'} onClose={() => setEdit(null)}>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              try {
+                await api(`/admin/routes${edit.id ? `/${edit.id}` : ''}`, {
+                  token,
+                  method: edit.id ? 'PUT' : 'POST',
+                  body: edit,
+                });
+                setEdit(null);
+                routes.reload();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {(['origin', 'destination', 'distance', 'fixedPrice'] as const).map((f) => (
+              <label key={f}>
+                {label(f)}
+                <input
+                  required
+                  type={f === 'distance' || f === 'fixedPrice' ? 'number' : 'text'}
+                  min={1}
+                  value={edit[f]}
+                  onChange={(e) =>
+                    setEdit({ ...edit, [f]: f === 'distance' || f === 'fixedPrice' ? Number(e.target.value) : e.target.value })
+                  }
+                />
+              </label>
+            ))}
+            <label className="checkbox-label" style={{ margin: '14px 0' }}>
+              <input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} />
+              <span style={{ marginLeft: 8 }}>Active Route (Visible in Customer search)</span>
+            </label>
+            {error && <ErrorBox message={error} />}
+            <button className="primary" disabled={busy}>
+              Save Route to Database
+            </button>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function Reports({ token }: { token: string }) {
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [vehicle, setVehicle] = useState('');
+  const [driver, setDriver] = useState('');
+  const [status, setStatus] = useState('');
+  const r = useResource<Store>(`/admin/reports?${new URLSearchParams({ from, to })}`, token);
+
+  const bookings = (r.data?.bookings || []).filter(
+    (b) =>
+      (!vehicle || b.vehicleType === vehicle) &&
+      (!driver || b.driverId === driver) &&
+      (!status || b.status === status)
+  );
+
+  const revenue = bookings.filter((b) => b.paymentStatus === 'PAID').reduce((a, b) => a + b.fare, 0);
+
+  function exportCsv() {
+    const rows = [
+      ['Booking Number', 'Customer', 'Phone', 'Pickup', 'Drop', 'Date', 'Time', 'Vehicle', 'Status', 'Payment', 'Fare'],
+      ...bookings.map((b) => [
+        b.bookingNumber,
+        b.name,
+        b.phone,
+        b.pickup,
+        b.drop,
+        b.date,
+        b.time,
+        b.vehicleType,
+        b.status,
+        b.paymentStatus,
+        String(b.fare),
+      ]),
+    ];
+    const content = rows.map((row) => row.map((c) => '"' + c.replaceAll('"', '""') + '"').join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `miles-and-moments-bookings-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <>
+      <Heading
+        title="Financial & Fleet Analytics"
+        description="Booking volume, payment settlement, and driver earnings."
+        action={
+          <button className="secondary" onClick={exportCsv}>
+            <Download size={16} /> Export Database Records (CSV)
+          </button>
+        }
+      />
+
+      <div className="filters">
+        <label>
+          From
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label>
+          To
+          <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        <select aria-label="Vehicle filter" value={vehicle} onChange={(e) => setVehicle(e.target.value)}>
+          <option value="">All Vehicle Categories</option>
+          {['Sedan', 'SUV', 'Tempo Traveller'].map((v) => (
+            <option key={v}>{v}</option>
+          ))}
+        </select>
+        <select aria-label="Driver filter" value={driver} onChange={(e) => setDriver(e.target.value)}>
+          <option value="">All Chauffeurs</option>
+          {r.data?.drivers.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+        <select aria-label="Status filter" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All Statuses</option>
+          {Object.keys(transitions).map((v) => (
+            <option key={v}>{v}</option>
+          ))}
+        </select>
+      </div>
+
+      {r.loading ? (
+        <Loading />
+      ) : r.error ? (
+        <ErrorBox message={r.error} retry={r.reload} />
+      ) : (
+        <>
+          <div className="stats-grid">
+            <Stat title="Filtered Bookings" value={bookings.length} sub="In selected date window" />
+            <Stat title="Settled Online Revenue" value={money(revenue)} sub="Verified paid bookings" icon={IndianRupee} />
+            <Stat
+              title="Trips Completed"
+              value={bookings.filter((b) => b.status === 'COMPLETED').length}
+              sub="Successful drop-offs"
+              icon={Check}
+            />
+            <Stat
+              title="Cash Due / Collected"
+              value={money(
+                bookings
+                  .filter((b) => b.paymentStatus === 'CASH' && b.status !== 'CANCELLED')
+                  .reduce((s, b) => s + b.fare, 0)
+              )}
+              sub="Pay-to-driver bookings"
+              icon={Clock}
+            />
+          </div>
+
+          <div className="grid-two">
+            <section className="card panel">
+              <h2>Revenue Trajectory</h2>
+              <RevenueChart bookings={bookings} />
+            </section>
+            <section className="card panel">
+              <h2>Chauffeur Performance Leaderboard</h2>
+              {r.data?.drivers.map((d) => (
+                <div className="report-row" key={d.id}>
+                  <div>
+                    <strong>{d.name}</strong>
+                    <small>★ {d.rating} · License {d.license}</small>
+                  </div>
+                  <span>
+                    {bookings.filter((b) => b.driverId === d.id && b.status === 'COMPLETED').length} completed
+                  </span>
+                  <strong>
+                    {money(
+                      bookings
+                        .filter((b) => b.driverId === d.id && b.paymentStatus === 'PAID')
+                        .reduce((s, b) => s + b.fare, 0)
+                    )}
+                  </strong>
+                </div>
+              ))}
+            </section>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function Notifications({ token }: { token: string }) {
+  const r = useResource<Notice[]>('/admin/notifications', token);
+  const customers = useResource<Customer[]>('/admin/customers', token);
+  const drivers = useResource<Driver[]>('/admin/drivers', token);
+  const [form, setForm] = useState({
+    recipientType: 'customer',
+    recipientId: 'all',
+    channel: 'SMS',
+    template: 'Booking confirmed',
+    message: 'Your booking has been confirmed with Miles & Moments. Chauffeur details will be sent shortly.',
+  });
+  const [preview, setPreview] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  return (
+    <>
+      <Heading
+        title="Broadcast Dispatch Alerts"
+        description="Send SMS and WhatsApp updates directly to customers and chauffeurs."
+      />
+      <div className="grid-two">
+        <form
+          className="card panel"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setPreview(true);
+          }}
+        >
+          <h2>Compose Outbound Notification</h2>
+          {error && <ErrorBox message={error} />}
+          {success && <p className="notice">{success}</p>}
+          <div className="form-grid">
+            <label>
+              Audience
+              <select
+                value={form.recipientType}
+                onChange={(e) => setForm({ ...form, recipientType: e.target.value, recipientId: 'all' })}
+              >
+                <option value="customer">Customers</option>
+                <option value="driver">Chauffeurs / Drivers</option>
+              </select>
+            </label>
+            <label>
+              Recipient
+              <select value={form.recipientId} onChange={(e) => setForm({ ...form, recipientId: e.target.value })}>
+                <option value="all">All {form.recipientType}s</option>
+                {(form.recipientType === 'customer' ? customers.data : drivers.data)?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name || c.phone}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Channel
+              <select value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
+                {['WhatsApp', 'SMS', 'Email'].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Template
+              <select
+                value={form.template}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    template: e.target.value,
+                    message: `Miles & Moments Update: ${e.target.value}. Please contact dispatch at +91 80 4712 3456 if you have any questions.`,
+                  })
+                }
+              >
+                {['Booking confirmed', 'Driver assigned', 'Trip started', 'Trip completed', 'Emergency notice'].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label>
+            Message Body
+            <textarea
+              required
+              maxLength={2000}
+              rows={5}
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+            />
+          </label>
+          <button className="primary">Preview Message <ArrowRight size={16} /></button>
+        </form>
+
+        <section className="card panel">
+          <h2>Outbox Log</h2>
+          {r.data?.slice(0, 20).map((n) => (
+            <div className="notification-row" key={n.id}>
+              <Bell size={18} />
+              <div>
+                <strong>{n.channel} → {n.recipientType}</strong>
+                <p className="message-text">{n.message}</p>
+                <Badge value={n.status} />
+              </div>
+            </div>
+          ))}
+          {r.data?.length === 0 && <Empty title="No notifications sent yet" />}
+        </section>
+      </div>
+
+      {preview && (
+        <Modal title="Confirm Outbound Message" onClose={() => setPreview(false)}>
+          <p>
+            Sending via <strong>{form.channel}</strong> to{' '}
+            {form.recipientId === 'all' ? `all ${form.recipientType}s` : 'selected recipient'}:
+          </p>
+          <div className="message-preview">{form.message}</div>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const result = await api<{ sent: number; mock: boolean }>('/admin/notifications', {
+                  token,
+                  method: 'POST',
+                  body: form,
+                });
+                setSuccess(`${result.sent} notification(s) dispatched.`);
+                setPreview(false);
+                r.reload();
+              } catch (e) {
+                setError((e as Error).message);
+                setPreview(false);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? 'Dispatching…' : 'Confirm & Send'}
+          </button>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function SettingsPage({ token }: { token: string }) {
+  const r = useResource<Settings & { providers: Record<string, string> }>('/admin/settings', token);
+  const [form, setForm] = useState<Settings | null>(null);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (r.data) setForm(r.data);
+  }, [r.data]);
+
+  if (!form) return r.error ? <ErrorBox message={r.error} retry={r.reload} /> : <Loading />;
+
+  return (
+    <>
+      <Heading
+        title="Business Configuration"
+        description="Company profile, GST details, policies, and APK release information."
+      />
+      <form
+        className="card panel"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          try {
+            await api('/admin/settings', { token, method: 'PUT', body: form });
+            setSaved(true);
+            setError('');
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {error && <ErrorBox message={error} />}
+        {saved && <p className="notice">Settings saved to PostgreSQL database.</p>}
+        <div className="form-grid">
+          {(
+            ['businessName', 'phone', 'email', 'address', 'cancellationHours', 'apkUrl', 'apkVersion', 'apkSize'] as const
+          ).map((f) => (
+            <label key={f}>
+              {label(f.replace(/([A-Z])/g, ' $1'))}
+              <input
+                required={f !== 'apkUrl'}
+                type={f === 'email' ? 'email' : f === 'cancellationHours' ? 'number' : f === 'apkUrl' ? 'url' : 'text'}
+                value={form[f]}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    [f]: f === 'cancellationHours' ? Number(e.target.value) : e.target.value,
+                  })
+                }
+              />
+            </label>
+          ))}
+        </div>
+        {(['terms', 'privacy'] as const).map((f) => (
+          <label key={f}>
+            {label(f)}
+            <textarea
+              required
+              minLength={10}
+              rows={3}
+              value={form[f]}
+              onChange={(e) => setForm({ ...form, [f]: e.target.value })}
+            />
+          </label>
+        ))}
+        <button disabled={busy} className="primary" style={{ marginTop: 14 }}>
+          {busy ? 'Saving…' : 'Save Business Settings'}
+        </button>
+      </form>
+
+      <section className="card panel">
+        <h2>Provider Integrations (Environment Verified)</h2>
+        {Object.entries(r.data?.providers || {}).map(([k, v]) => (
+          <div className="report-row" key={k}>
+            <strong>{label(k)}</strong>
+            <span className="badge" style={{ background: '#f1f5f9', color: '#334155' }}>{v}</span>
+          </div>
+        ))}
+        <div className="report-row">
+          <strong>Database</strong>
+          <span className="db-badge"><span className="db-dot" /> PostgreSQL 16 (transport_db)</span>
+        </div>
+      </section>
+    </>
+  );
+}
