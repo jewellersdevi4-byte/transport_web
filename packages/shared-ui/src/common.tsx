@@ -62,5 +62,51 @@ export function Auth({admin=false,onLogin}:{admin?:boolean;onLogin:(token:string
 
 export function BookingCard({booking:b,onClick}:{booking:Booking;onClick:()=>void}){return <button className="booking-card card" onClick={onClick}><div className="section-title"><strong>#{b.bookingNumber}</strong><Badge value={b.status}/></div><h3>{b.pickup} <ArrowRight size={16}/> {b.drop}</h3><p className="muted">{b.date} · {b.time} · {b.vehicleType}</p><div className="section-title"><span>{b.name}</span><strong>View details <ArrowRight size={16}/></strong></div></button>;}
 export type DetailBooking=Booking&{driver?:Driver;vehicle?:Vehicle};
-export function BookingInfo({b}:{b:DetailBooking}){const stages=['PENDING','CONFIRMED','DRIVER_ASSIGNED','TRIP_STARTED','COMPLETED'];return <><div className="section-title"><p className="eyebrow">#{b.bookingNumber}</p><Badge value={b.status}/></div><div className="route-display"><MapPin/><div><small>YOUR JOURNEY</small><h2>{b.pickup}</h2>{b.stops&&b.stops.length>0&&<p className="muted">via {b.stops.join(' → ')}</p>}<p className="muted">to</p><h2>{b.drop}</h2></div></div><div className="info-grid">{[['Pickup',`${b.date} · ${b.time}`],['Trip',`${label(b.tripType)}${b.stops&&b.stops.length>0?` (${b.stops.length} stops)`:''}${b.returnDate?` · Return ${b.returnDate}`:''}`],['Vehicle',`${b.vehicleType} · ${b.vehicle?.number||''}`],['Travellers',`${b.passengers} passengers · ${b.luggage} bags`],['Customer',`${b.name} · ${b.phone}`],['Status',`${label(b.status)} · Confirmed`]].map(([title,value])=><div key={title}><small>{title}</small><strong>{value}</strong></div>)}</div>{b.requests&&<p className="notice">{b.requests}</p>}<h3>Journey progress</h3><ol className="timeline">{stages.map((s,i)=><li key={s} className={stages.indexOf(b.status)>=i?'done':''}><span>{stages.indexOf(b.status)>=i?<Check size={14}/>:i+1}</span>{label(s==='PENDING'?'BOOKING_RECEIVED':s)}</li>)}</ol>{b.status==='CANCELLED'&&<p className="error">This booking was cancelled.{b.paymentStatus==='PAID'?' Support will review the payment for a refund.':''}</p>}{b.driver&&<div className="driver-summary"><div className="avatar">{b.driver.name.split(' ').map(n=>n[0]).join('')}</div><div><h3>{b.driver.name}</h3><p>{b.vehicle?.model} · {b.vehicle?.number}</p><Badge value={b.assignment}/></div><a className="secondary" href={`tel:${b.driver.phone}`}><Phone size={16}/> Call driver</a></div>}<details><summary>Status history</summary>{b.history.map((h,i)=><p key={i}>{label(h.status)} · {new Date(h.at).toLocaleString()} · {h.by==='admin'?'Dispatch':h.by==='Payment provider'?'Payment verified':'Journey update'}</p>)}</details></>;}
+export function BookingInfo({b}:{b:DetailBooking}){
+  const stages=['PENDING','CONFIRMED','DRIVER_ASSIGNED','TRIP_STARTED','COMPLETED'];
+  return <>
+    <div className="section-title"><p className="eyebrow">#{b.bookingNumber}</p><Badge value={b.status}/></div>
+    <div className="route-display"><MapPin/><div><small>YOUR JOURNEY</small><h2>{b.pickup}</h2>{b.stops&&b.stops.length>0&&<p className="muted">via {b.stops.join(' → ')}</p>}<p className="muted">to</p><h2>{b.drop}</h2></div></div>
+    <div className="info-grid">{[['Pickup',`${b.date} · ${b.time}`],['Trip',`${label(b.tripType)}${b.stops&&b.stops.length>0?` (${b.stops.length} stops)`:''}${b.returnDate?` · Return ${b.returnDate}`:''}`],['Vehicle',`${b.vehicleType} · ${b.vehicle?.number||b.vehicle?.model||'Assigned upon dispatch'}`],['Travellers',`${b.passengers} passengers · ${b.luggage} bags`],['Customer',`${b.name} · ${b.phone}`],['Status',`${label(b.status)} · Confirmed`]].map(([title,value])=><div key={title}><small>{title}</small><strong>{value}</strong></div>)}</div>
+    {b.requests&&<p className="notice">{b.requests}</p>}
+    <h3>Journey progress</h3>
+    <ol className="timeline">{stages.map((s,i)=><li key={s} className={stages.indexOf(b.status)>=i?'done':''}><span>{stages.indexOf(b.status)>=i?<Check size={14}/>:i+1}</span>{label(s==='PENDING'?'BOOKING_RECEIVED':s)}</li>)}</ol>
+    {b.status==='CANCELLED'&&<p className="error">This booking was cancelled.{b.paymentStatus==='PAID'?' Support will review the payment for a refund.':''}</p>}
+    {b.driver ? (
+      <div className="driver-summary">
+        <div className="avatar">{b.driver.name.split(' ').map(n=>n[0]).join('')}</div>
+        <div>
+          <h3>{b.driver.name}</h3>
+          <p>{b.vehicle?.model} · {b.vehicle?.number}</p>
+          <Badge value={b.assignment}/>
+        </div>
+        <a className="secondary" href={`tel:${b.driver.phone}`}><Phone size={16}/> Call driver</a>
+      </div>
+    ) : (
+      b.status === 'DRIVER_ASSIGNED' && (
+        <div className="notice" style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
+          <Car size={20} />
+          <span>Chauffeur dispatch in progress. Driver and vehicle details will appear here as soon as accepted.</span>
+        </div>
+      )
+    )}
+    {b.driverLocation && (
+      <div className="notice" style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a', marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <MapPin size={18} style={{ color: '#0f766e' }} />
+          <span><strong>Chauffeur Live Location Active:</strong> Last updated {new Date(b.driverLocation.updatedAt).toLocaleTimeString()}</span>
+        </div>
+        <a
+          href={`https://www.google.com/maps?q=${b.driverLocation.lat},${b.driverLocation.lng}`}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: '#0f766e', fontWeight: 600, textDecoration: 'underline' }}
+        >
+          View on Map →
+        </a>
+      </div>
+    )}
+    <details><summary>Status history</summary>{b.history.map((h,i)=><p key={i}>{label(h.status)} · {new Date(h.at).toLocaleString()} · {h.by==='admin'?'Dispatch':h.by==='Payment provider'?'Payment verified':'Journey update'}</p>)}</details>
+  </>;
+}
 export function Invoice({id,token,prefix}:{id:string;token:string;prefix:string}){const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [data,setData]=useState<{invoiceNumber:string;business:Settings;booking:Booking;total:number}|null>(null);const [viewing,setViewing]=useState(false);async function fetchInvoice(){if(data)return data;const r=await api<{invoiceNumber:string;business:Settings;booking:Booking;total:number}>(`/${prefix}/bookings/${id}/invoice`,{token});setData(r);return r;}async function download(){setBusy(true);setError('');try{const r=await fetchInvoice();const routeText=r.booking.stops&&r.booking.stops.length?`${r.booking.pickup} via ${r.booking.stops.join(', ')} → ${r.booking.drop}`:`${r.booking.pickup} → ${r.booking.drop}`;const text=[r.business.businessName,r.business.address,r.business.phone,r.business.email,'',`INVOICE ${r.invoiceNumber}`,`Booking: ${r.booking.bookingNumber}`,`Customer: ${r.booking.name}`,`Route: ${routeText}`,`Vehicle: ${r.booking.vehicleType}`,`Pickup: ${r.booking.date} ${r.booking.time}`,`Payment: ${r.booking.paymentStatus}`,`Total: INR ${r.total}`].join('\n');const url=URL.createObjectURL(new Blob([text],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download=`${r.invoiceNumber}.txt`;a.click();URL.revokeObjectURL(url);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}async function view(){setBusy(true);setError('');try{await fetchInvoice();setViewing(true);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}return <><div className="invoice-actions"><button className="secondary" onClick={view} disabled={busy}><FileText size={16}/> View invoice</button><button className="secondary" onClick={download} disabled={busy}><Download size={16}/>{busy?'Generating…':'Download invoice'}</button></div>{error&&<ErrorBox message={error} retry={download}/>}{viewing&&data&&<Modal title={`Invoice ${data.invoiceNumber}`} onClose={()=>setViewing(false)}><div className="invoice-paper"><div className="section-title"><div><h2>{data.business.businessName}</h2><p className="muted">{data.business.address}</p><small>{data.business.phone} · {data.business.email}</small></div><Badge value={data.booking.paymentStatus}/></div><hr/><div className="info-grid"><div><small>INVOICE NO.</small><strong>{data.invoiceNumber}</strong></div><div><small>BOOKING NO.</small><strong>#{data.booking.bookingNumber}</strong></div><div><small>CUSTOMER</small><strong>{data.booking.name}</strong></div><div><small>DATE</small><strong>{data.booking.date} {data.booking.time}</strong></div><div><small>ROUTE</small><strong>{data.booking.pickup}{data.booking.stops&&data.booking.stops.length?` (via ${data.booking.stops.join(', ')})`:''} → {data.booking.drop}</strong></div><div><small>VEHICLE</small><strong>{data.booking.vehicleType}</strong></div></div><hr/><div className="section-title"><span>Fare & Charges</span><strong>{money(data.total)}</strong></div><div className="section-title"><span>Payment Method</span><strong>{label(data.booking.paymentMethod)} ({label(data.booking.paymentStatus)})</strong></div><div className="section-title" style={{fontSize:'1.2rem'}}><strong>Total Paid / Due</strong><strong className="price">{money(data.total)}</strong></div><div className="actions" style={{marginTop:'1.5rem'}}><button className="primary" onClick={download}><Download size={16}/> Download PDF/Text</button><button className="secondary" onClick={()=>setViewing(false)}>Close</button></div></div></Modal>}</>;}

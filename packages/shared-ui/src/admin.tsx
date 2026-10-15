@@ -25,7 +25,10 @@ import {
   Phone,
   Database,
   RefreshCw,
-  FileText
+  FileText,
+  Navigation,
+  Share2,
+  Copy
 } from 'lucide-react';
 import type { Booking, Driver, Vehicle, Pricing, Route, Notice, Settings, Customer, Store } from '../../shared-types/src/index';
 import { transitions } from '../../shared-utils/src/index';
@@ -582,6 +585,7 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
   const [confirm, setConfirm] = useState('');
   const [message, setMessage] = useState('');
   const [notifyOpen, setNotifyOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function action(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST') {
     setBusy(true);
@@ -682,45 +686,134 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
           <h3>Driver Response Channel</h3>
           <Badge value={b.assignment} />
 
-          {b.assignment === 'ASSIGNED' && (
-            <div style={{ marginTop: 12, padding: 14, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10 }}>
-              <strong style={{ fontSize: 12, display: 'block', marginBottom: 4, color: '#166534' }}>
-                WhatsApp Dispatch Simulation:
-              </strong>
-              <small style={{ color: '#15803d', display: 'block', marginBottom: 10 }}>
-                Chauffeur was notified via WhatsApp Business API.
-              </small>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  className="primary small"
-                  style={{ background: '#16a34a', flex: 1 }}
-                  disabled={busy}
-                  onClick={() => action('/driver/assignment-response', { bookingId: id, response: 'YES' })}
-                >
-                  Reply YES (Accept)
-                </button>
-                <button
-                  className="secondary small"
-                  style={{ color: '#dc2626', flex: 1 }}
-                  disabled={busy}
-                  onClick={() => action('/driver/assignment-response', { bookingId: id, response: 'NO' })}
-                >
-                  Reply NO (Decline)
-                </button>
+          {b.assignment === 'ASSIGNED' && (() => {
+            const driverTripUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/driver/trip?token=${b.assignmentToken || ''}`;
+            const assignedDriver = drivers.data?.find((d) => d.id === b.driverId);
+            const assignedVehicle = vehicles.data?.find((v) => v.id === b.vehicleId);
+            const waText = encodeURIComponent(
+              `🚗 *Miles & Moments — New Trip Offer*\n\n` +
+              `*Booking ID:* #${b.bookingNumber}\n` +
+              `*Pickup:* ${b.pickup}\n` +
+              `*Drop:* ${b.drop}\n` +
+              `*Date & Time:* ${b.date} at ${b.time}\n` +
+              `*Vehicle:* ${assignedVehicle?.model || b.vehicleType} (${assignedVehicle?.number || ''})\n` +
+              `*Passengers:* ${b.passengers} | *Luggage:* ${b.luggage}\n\n` +
+              `👉 *Tap link to review & accept/decline:* \n${driverTripUrl}\n\n` +
+              `*(Link valid for 30 minutes)*`
+            );
+            const waUrl = `https://wa.me/91${assignedDriver?.phone?.replace(/\D/g, '').slice(-10) || ''}?text=${waText}`;
+
+            return (
+              <div style={{ marginTop: 12, padding: 14, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10 }}>
+                <strong style={{ fontSize: 13, display: 'block', marginBottom: 4, color: '#166534' }}>
+                  Awaiting Chauffeur Acceptance:
+                </strong>
+                <small style={{ color: '#15803d', display: 'block', marginBottom: 12 }}>
+                  Offered to {assignedDriver?.name || 'Driver'} ({assignedDriver?.phone || ''}). Customer sees driver details once accepted.
+                </small>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <a
+                    href={waUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="primary small"
+                    style={{ background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none' }}
+                  >
+                    <Share2 size={15} /> Send / Open in WhatsApp
+                  </a>
+
+                  <button
+                    type="button"
+                    className="secondary small"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    onClick={() => {
+                      if (typeof navigator !== 'undefined') {
+                        navigator.clipboard.writeText(driverTripUrl);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }
+                    }}
+                  >
+                    <Copy size={15} /> {copied ? 'Copied to Clipboard!' : 'Copy Driver Link'}
+                  </button>
+
+                  <a
+                    href={driverTripUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 11, color: '#0f766e', textAlign: 'center', textDecoration: 'underline', marginTop: 4 }}
+                  >
+                    Open Driver Mobile Screen →
+                  </a>
+                </div>
+
+                <div style={{ borderTop: '1px solid #bbf7d0', marginTop: 12, paddingTop: 10 }}>
+                  <small style={{ color: '#15803d', display: 'block', marginBottom: 6 }}>
+                    Direct dispatch simulation:
+                  </small>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="primary small"
+                      style={{ background: '#16a34a', flex: 1, fontSize: 11 }}
+                      disabled={busy}
+                      onClick={() => action('/driver/assignment-response', { bookingId: id, response: 'YES' })}
+                    >
+                      Accept (YES)
+                    </button>
+                    <button
+                      className="secondary small"
+                      style={{ color: '#dc2626', flex: 1, fontSize: 11 }}
+                      disabled={busy}
+                      onClick={() => action('/driver/assignment-response', { bookingId: id, response: 'NO' })}
+                    >
+                      Decline (NO)
+                    </button>
+                  </div>
+                </div>
               </div>
+            );
+          })()}
+
+          {b.assignment === 'DECLINED' && (
+            <div style={{ marginTop: 12, padding: 12, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10 }}>
+              <strong style={{ color: '#991b1b', fontSize: 13, display: 'block' }}>Chauffeur Declined</strong>
+              <p style={{ color: '#b91c1c', fontSize: 12, margin: '4px 0 10px' }}>
+                {b.assignmentDeclineReason || 'Driver declined the assignment offer.'}
+              </p>
+              <button className="primary small full" onClick={() => setAssign(true)}>
+                Reassign to Another Driver
+              </button>
             </div>
           )}
 
-          {b.assignment === 'DECLINED' && (
-            <p className="error" style={{ fontSize: 11 }}>
-              Driver declined this assignment. Please choose another available driver.
-            </p>
-          )}
-
           {b.assignment === 'ACCEPTED' && (
-            <p style={{ color: '#15803d', fontSize: 12, fontWeight: 600, marginTop: 8 }}>
-              ✓ Chauffeur accepted the assignment via WhatsApp.
-            </p>
+            <div style={{ marginTop: 12 }}>
+              <p style={{ color: '#15803d', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Check size={16} /> Chauffeur confirmed & locked for this ride.
+              </p>
+              {b.driverLocation && (
+                <div style={{ marginTop: 10, padding: 12, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10 }}>
+                  <strong style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0f766e', fontSize: 13 }}>
+                    <Navigation size={14} /> Chauffeur Live GPS Active
+                  </strong>
+                  <p style={{ fontSize: 12, color: '#475569', margin: '4px 0 8px' }}>
+                    Coordinates: {b.driverLocation.lat.toFixed(4)}, {b.driverLocation.lng.toFixed(4)}
+                    <br />
+                    Updated: {new Date(b.driverLocation.updatedAt).toLocaleTimeString()}
+                  </p>
+                  <a
+                    className="secondary small"
+                    href={`https://www.google.com/maps?q=${b.driverLocation.lat},${b.driverLocation.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    Track on Google Maps →
+                  </a>
+                </div>
+              )}
+            </div>
           )}
         </aside>
       </div>

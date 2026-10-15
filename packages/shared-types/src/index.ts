@@ -156,6 +156,15 @@ export interface Booking {
   driverId: string | null;
   assignment: AssignmentStatus;
   assignmentExpiresAt?: string;
+  assignmentToken?: string;
+  assignmentDeclineReason?: string;
+  driverLocation?: {
+    lat: number;
+    lng: number;
+    updatedAt: string;
+    speed?: number;
+    heading?: number;
+  };
   fare: number;
   fareBreakdown?: FareBreakdown;
   distance: number;
