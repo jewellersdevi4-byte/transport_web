@@ -1863,7 +1863,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
     setGenerating(true);
     setPairError('');
     try {
-      const res = await api<WhatsAppSession>('/admin/whatsapp/generate-qr', { token, method: 'POST' });
+      const res = await api<WhatsAppSession>('/admin/whatsapp/generate-qr?force=true', { token, method: 'POST' });
       setSession(res);
     } catch (e) {
       setPairError((e as Error).message);
@@ -1878,13 +1878,17 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
     setPairError('');
     setPairSuccess('');
     try {
-      const res = await api<{ success: boolean; session: WhatsAppSession }>('/admin/whatsapp/pair', {
+      const res = await api<{ success: boolean; pairingCode?: string; message?: string; session: WhatsAppSession }>('/admin/whatsapp/pair', {
         token,
         method: 'POST',
         body: { phone: pairingPhone },
       });
       if (res.session) setSession(res.session);
-      setPairSuccess(`WhatsApp linked successfully with ${pairingPhone}! Automated dispatch is now active.`);
+      if (res.pairingCode) {
+        setPairSuccess(`Official WhatsApp Code: ${res.pairingCode}. In WhatsApp on your phone, tap Linked Devices > Link with phone number instead, and enter this code.`);
+      } else {
+        setPairSuccess(`WhatsApp linked successfully with ${pairingPhone}!`);
+      }
       fetchHistory();
     } catch (e) {
       setPairError((e as Error).message);
@@ -2167,9 +2171,12 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
                   borderTop: '1px solid #e2e8f0',
                 }}
               >
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 8 }}>
-                  Direct Phone Pairing (Instant Connect)
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 4 }}>
+                  Link with Phone Number instead
                 </span>
+                <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748b' }}>
+                  Prefer not to scan? Enter your WhatsApp phone number to generate an official 8-digit WhatsApp linking code.
+                </p>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <input
                     type="text"
@@ -2180,7 +2187,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
                     style={{ flex: 1, fontSize: 12 }}
                   />
                   <button type="submit" className="primary small" disabled={pairing}>
-                    {pairing ? 'Connecting…' : 'Link Phone'}
+                    {pairing ? 'Requesting…' : 'Get Pairing Code'}
                   </button>
                 </div>
               </form>
