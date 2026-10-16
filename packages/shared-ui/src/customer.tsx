@@ -976,6 +976,17 @@ function TrackTripInline({ onOpenBooking }: { onOpenBooking: (id: string) => voi
   const [error, setError] = useState('');
   const [trip, setTrip] = useState<DetailBooking | null>(null);
 
+  useEffect(() => {
+    if (!trip || ['COMPLETED', 'CANCELLED'].includes(trip.status)) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api<DetailBooking>(`/public/track?bookingNumber=${encodeURIComponent(bookingNumber.trim())}&phone=${encodeURIComponent(phone.trim())}`);
+        setTrip(res);
+      } catch {}
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [trip?.status, bookingNumber, phone]);
+
   async function handleTrack(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -1037,6 +1048,46 @@ function TrackTripInline({ onOpenBooking }: { onOpenBooking: (id: string) => voi
             </div>
             <Badge value={trip.status} />
           </div>
+
+          {trip.status === 'TRIP_STARTED' && (
+            <div style={{ background: '#ecfdf5', border: '1.5px solid #34d399', borderRadius: 12, padding: '14px 16px', margin: '14px 0', color: '#065f46' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 15 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 0 3px #a7f3d0' }} />
+                🚗 Ride in Progress • Chauffeur En Route
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#047857' }}>
+                Your chauffeur {trip.driver?.name} has started the trip towards <strong>{trip.drop}</strong>. Settle the fare directly with the driver after drop-off.
+              </p>
+            </div>
+          )}
+
+          {trip.status === 'COMPLETED' && (
+            <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12, padding: '14px 16px', margin: '14px 0', color: '#166534' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 15 }}>
+                <Check size={18} /> ✅ Trip Completed • Safely Dropped Off
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#15803d' }}>
+                You have arrived at your destination. Thank you for traveling with Miles & Moments!
+              </p>
+            </div>
+          )}
+
+          {trip.driverLocation && trip.status === 'TRIP_STARTED' && (
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '10px 14px', margin: '12px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, color: '#1e40af' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <MapPin size={16} style={{ color: '#2563eb' }} />
+                <span>Chauffeur live GPS updating • Last seen {new Date(trip.driverLocation.updatedAt).toLocaleTimeString()}</span>
+              </div>
+              <a
+                href={`https://www.google.com/maps?q=${trip.driverLocation.lat},${trip.driverLocation.lng}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}
+              >
+                View on Map →
+              </a>
+            </div>
+          )}
 
           {trip.driver ? (
             <div className="driver-dispatch-box">

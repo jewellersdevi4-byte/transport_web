@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Check, X, MapPin, Phone, Car, Clock, Navigation, AlertTriangle, ShieldCheck, User } from 'lucide-react';
+import { Check, X, MapPin, Phone, Car, Clock, Navigation, AlertTriangle, ShieldCheck, User, Play, Flag } from 'lucide-react';
 import { apiClient } from '../../api-client/src/index';
 
 interface DriverAssignmentData {
   bookingNumber: string;
+  status?: string;
   pickup: string;
   drop: string;
   stops?: string[];
@@ -38,6 +39,7 @@ export function DriverTripView() {
   const [sharingGps, setSharingGps] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<string>('');
   const [lastLocation, setLastLocation] = useState<{ lat: number; lng: number; time: string } | null>(null);
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -59,6 +61,9 @@ export function DriverTripView() {
     try {
       const res = await apiClient<DriverAssignmentData>(`/driver/assignments/${tkn}`);
       setData(res);
+      if (res.status === 'TRIP_STARTED') {
+        setSharingGps(true);
+      }
       if (res.driverLocation) {
         setLastLocation({
           lat: res.driverLocation.lat,
@@ -79,7 +84,7 @@ export function DriverTripView() {
     setError('');
     try {
       const reason = choice === 'NO' ? (declineReason === 'Other' ? customReason : declineReason) : undefined;
-      const res = await apiClient<{ success: boolean; assignment: string; customerPhone?: string }>(
+      const res = await apiClient<{ success: boolean; status?: string; assignment: string; customerPhone?: string }>(
         `/driver/assignments/${token}/respond`,
         {
           method: 'POST',
@@ -90,6 +95,7 @@ export function DriverTripView() {
         setData({
           ...data,
           assignment: res.assignment,
+          status: res.status || data.status,
           customer: {
             ...data.customer,
             name: data.customer?.name || 'Customer',
@@ -105,9 +111,57 @@ export function DriverTripView() {
     }
   }
 
+  async function handleStartTrip() {
+    if (!token) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await apiClient<{ success: boolean; status: string; customer?: { name: string; phone?: string } }>(
+        `/driver/assignments/${token}/start`,
+        { method: 'POST' }
+      );
+      if (res.success && data) {
+        setData({
+          ...data,
+          status: res.status,
+          customer: res.customer || data.customer,
+        });
+        setSharingGps(true);
+      }
+    } catch (e) {
+      setError((e as Error).message || 'Failed to start trip.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCompleteTrip() {
+    if (!token) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await apiClient<{ success: boolean; status: string }>(
+        `/driver/assignments/${token}/complete`,
+        { method: 'POST' }
+      );
+      if (res.success && data) {
+        setData({
+          ...data,
+          status: res.status,
+        });
+        setSharingGps(false);
+        setCompleteConfirmOpen(false);
+      }
+    } catch (e) {
+      setError((e as Error).message || 'Failed to complete trip.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Live Location Sharing (GPS Watcher)
   useEffect(() => {
-    if (!sharingGps || !token || data?.assignment !== 'ACCEPTED') return;
+    if (!sharingGps || !token || (!['ACCEPTED'].includes(data?.assignment || '') && data?.status !== 'TRIP_STARTED')) return;
 
     if (!('geolocation' in navigator)) {
       setGpsStatus('Geolocation not supported by this browser.');
@@ -194,9 +248,11 @@ export function DriverTripView() {
     );
   }
 
-  const isAccepted = data.assignment === 'ACCEPTED';
+  const isAccepted = data.assignment === 'ACCEPTED' || data.status === 'TRIP_STARTED' || data.status === 'COMPLETED';
   const isDeclined = data.assignment === 'DECLINED';
   const isExpired = data.isExpired || data.assignment === 'EXPIRED';
+  const isTripStarted = data.status === 'TRIP_STARTED';
+  const isCompleted = data.status === 'COMPLETED';
 
   return (
     <main style={{ maxWidth: 500, margin: '24px auto', padding: '0 16px 60px', fontFamily: 'system-ui, sans-serif' }}>
@@ -211,18 +267,38 @@ export function DriverTripView() {
       {/* Main Trip Card */}
       <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
         {/* Status Banner */}
-        {isAccepted && (
+        {isCompleted ? (
+          <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12, padding: '16px', marginBottom: 18, color: '#166534', textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%', background: '#dcfce7', color: '#15803d', marginBottom: 8 }}>
+              <ShieldCheck size={26} />
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 18, color: '#14532d' }}>
+              🎉 Trip Completed • Customer Dropped
+            </div>
+            <p style={{ fontSize: 13, marginTop: 4, color: '#15803d' }}>
+              Trip reference #{data.bookingNumber} is marked completed. You and your vehicle are now marked <strong>Available</strong> for new bookings.
+            </p>
+          </div>
+        ) : isTripStarted ? (
+          <div style={{ background: '#ecfdf5', border: '1.5px solid #34d399', borderRadius: 12, padding: '14px 16px', marginBottom: 18, color: '#065f46' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: 16 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 0 3px #a7f3d0' }} />
+              🚗 Ride in Progress • En Route
+            </div>
+            <p style={{ fontSize: 13, marginTop: 4, color: '#047857' }}>
+              Passenger is on board. Live GPS location is active and streaming to dispatch and customer.
+            </p>
+          </div>
+        ) : isAccepted ? (
           <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 12, padding: '14px 16px', marginBottom: 18, color: '#166534' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 16 }}>
               <ShieldCheck size={20} /> Trip Accepted & Confirmed
             </div>
             <p style={{ fontSize: 13, marginTop: 4, color: '#15803d' }}>
-              You are assigned to this ride. Dispatch and customer have been notified.
+              You are assigned to this ride. Dispatch and customer have been notified. Tap "Start Trip" once passenger is picked up.
             </p>
           </div>
-        )}
-
-        {isDeclined && (
+        ) : isDeclined ? (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '14px 16px', marginBottom: 18, color: '#991b1b' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 16 }}>
               <X size={20} /> Trip Declined
@@ -231,9 +307,7 @@ export function DriverTripView() {
               You declined this trip. Dispatch will reassign to another chauffeur.
             </p>
           </div>
-        )}
-
-        {isExpired && !isAccepted && (
+        ) : isExpired ? (
           <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '14px 16px', marginBottom: 18, color: '#92400e' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 16 }}>
               <Clock size={20} /> Offer Expired
@@ -242,7 +316,7 @@ export function DriverTripView() {
               The 15-minute response window has elapsed. Contact dispatch if available.
             </p>
           </div>
-        )}
+        ) : null}
 
         {/* Route Details */}
         <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 16, marginBottom: 16 }}>
@@ -376,6 +450,70 @@ export function DriverTripView() {
           </div>
         )}
 
+        {/* Start Trip Action Card */}
+        {isAccepted && !isTripStarted && !isCompleted && (
+          <div style={{ marginTop: 14, background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 14, padding: 18, textAlign: 'center' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#166534', margin: '0 0 6px' }}>Ready to Begin Ride?</h3>
+            <p style={{ fontSize: 13, color: '#15803d', margin: '0 0 14px' }}>
+              Tap below when you reach the pickup location and passenger has boarded.
+            </p>
+            <button
+              onClick={handleStartTrip}
+              disabled={busy}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                padding: '16px 20px',
+                borderRadius: 12,
+                background: '#15803d',
+                color: '#fff',
+                fontSize: 16,
+                fontWeight: 700,
+                border: 'none',
+                cursor: busy ? 'not-allowed' : 'pointer',
+                boxShadow: '0 4px 14px rgba(21,128,61,0.3)',
+              }}
+            >
+              <Play size={20} fill="#fff" /> {busy ? 'Starting Trip…' : 'Start Trip (Passenger Picked Up)'}
+            </button>
+          </div>
+        )}
+
+        {/* Drop Customer / End Trip Action Card */}
+        {isTripStarted && (
+          <div style={{ marginTop: 14, background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: 14, padding: 18, textAlign: 'center' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>Reached Destination?</h3>
+            <p style={{ fontSize: 13, color: '#475569', margin: '0 0 14px' }}>
+              Tap below once the passenger is dropped off safely at <strong>{data.drop}</strong>.
+            </p>
+            <button
+              onClick={() => setCompleteConfirmOpen(true)}
+              disabled={busy}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                padding: '16px 20px',
+                borderRadius: 12,
+                background: '#0f766e',
+                color: '#fff',
+                fontSize: 16,
+                fontWeight: 700,
+                border: 'none',
+                cursor: busy ? 'not-allowed' : 'pointer',
+                boxShadow: '0 4px 14px rgba(15,118,110,0.3)',
+              }}
+            >
+              <Check size={20} /> Drop Customer & Complete Trip
+            </button>
+          </div>
+        )}
+
         {/* Live GPS Tracker Section (Active when Accepted) */}
         {isAccepted && (
           <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 18, marginTop: 10 }}>
@@ -488,6 +626,53 @@ export function DriverTripView() {
                 }}
               >
                 {busy ? 'Submitting…' : 'Confirm Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Trip Confirmation Modal */}
+      {completeConfirmOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            zIndex: 9999,
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: 16, padding: 24, maxWidth: 420, width: '100%' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', color: '#0f172a' }}>Confirm Customer Dropped Off?</h3>
+            <p style={{ fontSize: 13, color: '#475569', margin: '0 0 16px', lineHeight: 1.5 }}>
+              Please verify that you have safely arrived at <strong>{data.drop}</strong> and the passenger has exited the vehicle. This will mark the booking as completed in dispatch and release you for your next journey.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setCompleteConfirmOpen(false)}
+                disabled={busy}
+                style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCompleteTrip}
+                disabled={busy}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: '#15803d',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {busy ? 'Completing…' : 'Confirm Drop & Complete Trip'}
               </button>
             </div>
           </div>
