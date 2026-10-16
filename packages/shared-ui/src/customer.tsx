@@ -25,7 +25,8 @@ import {
   Download,
   Calendar,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2
 } from 'lucide-react';
 import type { Booking, Customer, Route, Settings, Vehicle } from '../../shared-types/src/index';
 import {
@@ -59,7 +60,12 @@ type Search = {
   stops: string[];
 };
 
-type Quote = Vehicle & { fare: number };
+type Quote = Vehicle & {
+  fare: number;
+  driverName?: string;
+  driverRating?: number;
+  driverTrips?: number;
+};
 
 export default function CustomerApp() {
   const session = useSession('customer');
@@ -417,6 +423,7 @@ function BookingWizard({
   const [step, setStep] = useState(0);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [directBooking, setDirectBooking] = useState(true);
   const [estimated, setEstimated] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -511,10 +518,13 @@ function BookingWizard({
         params.set('stops', JSON.stringify(validStops));
         params.set('stopPlaceIds', JSON.stringify(search.stopPlaceIds || []));
       }
-      const r = await api<{ vehicles: Quote[]; estimated: boolean; distance: number }>(`/customer/vehicles/available?${params.toString()}`);
+      const r = await api<{ vehicles: Quote[]; estimated: boolean; distance: number; directVehicleBooking?: boolean }>(`/customer/vehicles/available?${params.toString()}`);
       setQuotes(r.vehicles);
       setEstimated(r.estimated);
       setDistance(r.distance);
+      if (typeof r.directVehicleBooking === 'boolean') {
+        setDirectBooking(r.directVehicleBooking);
+      }
       setStep(1);
     } catch (e) {
       setError((e as Error).message);
@@ -538,6 +548,7 @@ function BookingWizard({
           stops: search.tripType === 'MULTI_CITY' ? search.stops.filter((s) => s.trim().length > 0) : undefined,
           ...details,
           vehicleType: quote?.type,
+          vehicleId: quote?.id,
           idempotencyKey: key,
         },
       });
@@ -807,14 +818,21 @@ function BookingWizard({
                   <Car size={85} strokeWidth={1.2} />
                 </div>
                 <div className="section-title">
-                  <h3>{v.type}</h3>
+                  <h3>{directBooking ? v.model : v.type}</h3>
                   <Badge value="Available" />
                 </div>
-                <p className="muted">{v.model} or verified equivalent</p>
+                <p className="muted">
+                  {directBooking ? `${v.type} · Reg: ${v.number}` : `${v.model} or verified equivalent`}
+                </p>
                 <div className="vehicle-features">
                   <span><Users size={15} /> {v.capacity} passenger seats</span>
                   <span><Wind size={15} /> {v.ac ? 'Climate Controlled AC' : 'Non-AC'}</span>
                   <span><Luggage size={15} /> Luggage boot</span>
+                  {directBooking && v.driverName && (
+                    <span style={{ color: '#047857', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <CheckCircle2 size={14} /> Chauffeur: {v.driverName}
+                    </span>
+                  )}
                 </div>
                 <div className="section-title" style={{ marginTop: 12 }}>
                   <span className="primary small" style={{ width: '100%', justifyContent: 'center' }}>
@@ -874,7 +892,7 @@ function BookingWizard({
               </h3>
               <p>{search.date} · {search.time}</p>
               {distance && <p>{distance} km by road {search.tripType === 'ROUND_TRIP' ? '· includes return journey' : ''}</p>}
-              <p>{quote.type} ({quote.model}) · {details.passengers} passenger(s)</p>
+              <p>{directBooking ? `${quote.model} (${quote.number}) · ${quote.type}` : `${quote.type} (${quote.model})`} · {details.passengers} passenger(s)</p>
               <hr />
               <p className="notice">Instant reservation confirmation. Chauffeur and vehicle details will be dispatched prior to pickup.</p>
               <button className="primary full" disabled={busy}>

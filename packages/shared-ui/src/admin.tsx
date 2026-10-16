@@ -57,8 +57,7 @@ import {
 const navigation = [
   ['Dashboard', LayoutDashboard],
   ['Bookings', CalendarDays],
-  ['Drivers', Users],
-  ['Vehicles', Car],
+  ['Fleet', Car],
   ['Pricing', Tag],
   ['Reports', ChartNoAxesCombined],
   ['WhatsApp', MessageSquare],
@@ -168,8 +167,8 @@ export default function AdminApp() {
             <Dashboard token={session.token} open={setBooking} goBookings={() => setPage('Bookings')} />
           ) : page === 'Bookings' ? (
             <Bookings token={session.token} open={setBooking} />
-          ) : page === 'Drivers' || page === 'Vehicles' ? (
-            <Fleet token={session.token} kind={page} />
+          ) : page === 'Fleet' || page === 'Drivers' || page === 'Vehicles' ? (
+            <Fleet token={session.token} />
           ) : page === 'Pricing' ? (
             <PricingPage token={session.token} />
           ) : page === 'Reports' ? (
@@ -466,6 +465,11 @@ function BookingTable({ bookings, open }: { bookings: Booking[]; open: (id: stri
                 <button className="table-link" onClick={() => open(b.id)}>
                   #{b.bookingNumber}
                 </button>
+                {b.directBooking && (
+                  <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontSize: '0.68rem', display: 'block', width: 'fit-content', marginTop: 2, fontWeight: 700 }}>
+                    ⚡ Direct
+                  </span>
+                )}
               </td>
               <td>
                 <strong>{b.name}</strong>
@@ -1084,29 +1088,44 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
   );
 }
 
-function Fleet({ token, kind }: { token: string; kind: 'Drivers' | 'Vehicles' }) {
-  const resource = kind.toLowerCase();
-  const r = useResource<(Driver | Vehicle)[]>(`/admin/${resource}`, token);
-  const vehicles = useResource<Vehicle[]>('/admin/vehicles', token);
+function Fleet({ token }: { token: string }) {
+  const r = useResource<(Vehicle & { driverName?: string; driverPhone?: string; driverLicense?: string })[]>('/admin/vehicles', token);
+  const settings = useResource<Settings>('/admin/settings', token);
   const [query, setQuery] = useState('');
-  const [edit, setEdit] = useState<Record<string, unknown> | null>(null);
+  const [edit, setEdit] = useState<{
+    id?: string;
+    type: 'Sedan' | 'SUV' | 'Tempo Traveller';
+    number: string;
+    model: string;
+    capacity: number;
+    ac: boolean;
+    status: 'Available' | 'On Trip' | 'Maintenance' | 'Inactive';
+    driverName: string;
+    driverPhone: string;
+    driverLicense: string;
+  } | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const isDriver = kind === 'Drivers';
-  const fields = isDriver
-    ? ['name', 'phone', 'license', 'vehicleId', 'status', 'rating', 'trips']
-    : ['type', 'number', 'model', 'capacity', 'ac', 'status'];
+  const [toggleBusy, setToggleBusy] = useState(false);
 
-  const defaults = isDriver
-    ? { name: '', phone: '', license: '', vehicleId: '', status: 'Available', rating: 5, trips: 0 }
-    : { type: 'Sedan', number: '', model: '', capacity: 4, ac: true, status: 'Available' };
+  const defaults = {
+    type: 'Sedan' as const,
+    number: '',
+    model: '',
+    capacity: 4,
+    ac: true,
+    status: 'Available' as const,
+    driverName: '',
+    driverPhone: '',
+    driverLicense: '',
+  };
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      await api(`/admin/${resource}${edit?.id ? `/${edit.id}` : ''}`, {
+      await api(`/admin/vehicles${edit?.id ? `/${edit.id}` : ''}`, {
         method: edit?.id ? 'PUT' : 'POST',
         token,
         body: edit,
@@ -1120,25 +1139,55 @@ function Fleet({ token, kind }: { token: string; kind: 'Drivers' | 'Vehicles' })
     }
   }
 
+  async function toggleDirectBooking() {
+    if (!settings.data) return;
+    setToggleBusy(true);
+    try {
+      await api('/admin/settings', {
+        method: 'PUT',
+        token,
+        body: {
+          ...settings.data,
+          directVehicleBooking: !settings.data.directVehicleBooking,
+        },
+      });
+      settings.reload();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setToggleBusy(false);
+    }
+  }
+
+  const isDirectActive = Boolean(settings.data?.directVehicleBooking);
+
   return (
     <>
       <Heading
-        title={isDriver ? 'Chauffeurs & Drivers' : 'Fleet Vehicles'}
-        description={
-          isDriver
-            ? 'Manage drivers, mobile numbers, and vehicle bindings.'
-            : 'Maintain vehicle registration, air conditioning, and operational states.'
-        }
+        title="Fleet & Chauffeurs"
+        description="Unified commercial vehicles and attached chauffeur contacts. When Direct Booking is enabled, customers select vehicles directly with auto-confirmation."
         action={
-          <button
-            className="primary"
-            onClick={() => {
-              setEdit(defaults);
-              setError('');
-            }}
-          >
-            <Plus size={16} /> Add {isDriver ? 'Driver' : 'Vehicle'}
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button
+              className="secondary"
+              disabled={toggleBusy || !settings.data}
+              onClick={toggleDirectBooking}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}
+              title="Click to toggle Direct Vehicle Booking ON or OFF"
+            >
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: isDirectActive ? '#10b981' : '#94a3b8' }} />
+              Direct Booking: {isDirectActive ? 'ON (Auto-Confirmed)' : 'OFF (Manual Approval)'}
+            </button>
+            <button
+              className="primary"
+              onClick={() => {
+                setEdit(defaults);
+                setError('');
+              }}
+            >
+              <Plus size={16} /> Add Vehicle & Chauffeur
+            </button>
+          </div>
         }
       />
 
@@ -1146,8 +1195,8 @@ function Fleet({ token, kind }: { token: string; kind: 'Drivers' | 'Vehicles' })
         <label className="search-field">
           <Search size={16} />
           <input
-            aria-label={`Search ${resource}`}
-            placeholder={`Search ${resource}…`}
+            aria-label="Search fleet"
+            placeholder="Search vehicles or chauffeurs by model, number, driver name…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -1165,32 +1214,67 @@ function Fleet({ token, kind }: { token: string; kind: 'Drivers' | 'Vehicles' })
             .map((item) => (
               <article key={item.id} className="card fleet-card">
                 <div className="section-title">
-                  <div className={isDriver ? 'avatar' : 'vehicle-icon'}>
-                    {isDriver ? (item as Driver).name[0] : <Car size={26} />}
+                  <div className="vehicle-icon">
+                    <Car size={26} />
                   </div>
                   <Badge value={item.status} />
                 </div>
-                <h2>{isDriver ? (item as Driver).name : (item as Vehicle).model}</h2>
-                {isDriver ? (
-                  <>
-                    <p className="muted">{(item as Driver).phone}</p>
-                    <p>
-                      Assigned: {vehicles.data?.find((v) => v.id === (item as Driver).vehicleId)?.number || 'None'}
+                <h2>{item.model}</h2>
+                <p><strong>{item.number}</strong></p>
+                <p className="muted">
+                  {item.type} · {item.capacity} seats · {item.ac ? 'Climate Controlled AC' : 'Non-AC'}
+                </p>
+
+                <div style={{ margin: '12px 0', padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <p style={{ margin: '0 0 4px', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700 }}>
+                    ASSIGNED CHAUFFEUR
+                  </p>
+                  {item.driverName ? (
+                    <>
+                      <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
+                        👤 {item.driverName}
+                      </p>
+                      <p style={{ margin: '2px 0 0', color: '#059669', fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Phone size={13} /> +91 {item.driverPhone} (WhatsApp)
+                      </p>
+                      {item.driver && (
+                        <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.8rem' }}>
+                          ★ {item.driver.rating || 5.0} · {item.driver.trips || 0} completed trips
+                        </p>
+                      )}
+                      {(item.driverLicense || item.driver?.license) && (
+                        <p style={{ margin: '2px 0 0', color: '#94a3b8', fontSize: '0.76rem' }}>
+                          License: {item.driverLicense || item.driver?.license}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p style={{ margin: 0, color: '#d97706', fontSize: '0.86rem', fontWeight: 600 }}>
+                      ⚠️ No chauffeur contact attached
                     </p>
-                    <p>★ {(item as Driver).rating} · {(item as Driver).trips} completed trips</p>
-                    <small className="muted">License: {(item as Driver).license}</small>
-                  </>
-                ) : (
-                  <>
-                    <p><strong>{(item as Vehicle).number}</strong></p>
-                    <p className="muted">
-                      {(item as Vehicle).type} · {(item as Vehicle).capacity} seats · {(item as Vehicle).ac ? 'AC' : 'Non-AC'}
-                    </p>
-                  </>
-                )}
+                  )}
+                </div>
+
                 <div className="actions">
-                  <button className="secondary" onClick={() => { setEdit({ ...item }); setError(''); }}>
-                    Edit Record
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      setEdit({
+                        id: item.id,
+                        type: item.type,
+                        number: item.number,
+                        model: item.model,
+                        capacity: item.capacity,
+                        ac: item.ac,
+                        status: item.status,
+                        driverName: item.driverName || item.driver?.name || '',
+                        driverPhone: item.driverPhone || item.driver?.phone || '',
+                        driverLicense: item.driverLicense || item.driver?.license || '',
+                      });
+                      setError('');
+                    }}
+                  >
+                    Edit Vehicle & Chauffeur
                   </button>
                 </div>
               </article>
@@ -1199,59 +1283,68 @@ function Fleet({ token, kind }: { token: string; kind: 'Drivers' | 'Vehicles' })
       )}
 
       {edit && (
-        <Modal title={`${edit.id ? 'Edit' : 'Add'} ${isDriver ? 'Driver' : 'Vehicle'}`} onClose={() => setEdit(null)}>
+        <Modal title={`${edit.id ? 'Edit' : 'Add'} Vehicle & Chauffeur`} onClose={() => setEdit(null)}>
           <form onSubmit={save}>
             {error && <ErrorBox message={error} />}
+
+            <p className="eyebrow" style={{ marginTop: 0 }}>VEHICLE SPECIFICATIONS</p>
             <div className="form-grid">
-              {fields.map((f) => (
-                <label key={f}>
-                  {label(f.replace(/([A-Z])/g, ' $1'))}
-                  {f === 'vehicleId' ? (
-                    <select required value={String(edit[f] || '')} onChange={(e) => setEdit({ ...edit, [f]: e.target.value })}>
-                      <option value="">Select vehicle</option>
-                      {vehicles.data?.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.number} · {v.model} ({v.type})
-                        </option>
-                      ))}
-                    </select>
-                  ) : f === 'status' || f === 'type' || f === 'ac' ? (
-                    <select
-                      value={String(edit[f])}
-                      onChange={(e) => setEdit({ ...edit, [f]: f === 'ac' ? e.target.value === 'true' : e.target.value })}
-                    >
-                      {(f === 'status'
-                        ? isDriver
-                          ? ['Available', 'On Trip', 'Inactive']
-                          : ['Available', 'On Trip', 'Maintenance', 'Inactive']
-                        : f === 'type'
-                        ? ['Sedan', 'SUV', 'Tempo Traveller']
-                        : ['true', 'false']
-                      ).map((s) => (
-                        <option key={s} value={s}>
-                          {f === 'ac' ? (s === 'true' ? 'AC' : 'Non-AC') : s}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      required
-                      type={['capacity', 'rating', 'trips'].includes(f) ? 'number' : 'text'}
-                      step={f === 'rating' ? 0.1 : 1}
-                      value={String(edit[f] ?? '')}
-                      onChange={(e) =>
-                        setEdit({
-                          ...edit,
-                          [f]: ['capacity', 'rating', 'trips'].includes(f) ? Number(e.target.value) : e.target.value,
-                        })
-                      }
-                    />
-                  )}
-                </label>
-              ))}
+              <label>
+                Vehicle Type
+                <select value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value as any })}>
+                  <option value="Sedan">Sedan</option>
+                  <option value="SUV">SUV</option>
+                  <option value="Tempo Traveller">Tempo Traveller</option>
+                </select>
+              </label>
+              <label>
+                Vehicle Model
+                <input required placeholder="e.g. Toyota Innova Crysta" value={edit.model} onChange={(e) => setEdit({ ...edit, model: e.target.value })} />
+              </label>
+              <label>
+                Registration Number
+                <input required placeholder="e.g. KA 01 AB 1234" value={edit.number} onChange={(e) => setEdit({ ...edit, number: e.target.value })} />
+              </label>
+              <label>
+                Passenger Capacity (Seats)
+                <input required type="number" min={1} max={50} value={edit.capacity} onChange={(e) => setEdit({ ...edit, capacity: Number(e.target.value) })} />
+              </label>
+              <label>
+                Air Conditioning
+                <select value={String(edit.ac)} onChange={(e) => setEdit({ ...edit, ac: e.target.value === 'true' })}>
+                  <option value="true">Climate Controlled AC</option>
+                  <option value="false">Non-AC</option>
+                </select>
+              </label>
+              <label>
+                Operational Status
+                <select value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value as any })}>
+                  <option value="Available">Available</option>
+                  <option value="On Trip">On Trip</option>
+                  <option value="Maintenance">Maintenance</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </label>
             </div>
+
+            <p className="eyebrow" style={{ marginTop: 18 }}>ASSIGNED CHAUFFEUR CONTACT</p>
+            <div className="form-grid">
+              <label>
+                Chauffeur Full Name
+                <input required placeholder="e.g. Ramesh Kumar" value={edit.driverName} onChange={(e) => setEdit({ ...edit, driverName: e.target.value })} />
+              </label>
+              <label>
+                Mobile / WhatsApp Number (10 digits)
+                <input required placeholder="e.g. 9845012345" value={edit.driverPhone} onChange={(e) => setEdit({ ...edit, driverPhone: e.target.value })} />
+              </label>
+              <label>
+                Commercial Driving License
+                <input placeholder="e.g. KA0120200012345" value={edit.driverLicense} onChange={(e) => setEdit({ ...edit, driverLicense: e.target.value })} />
+              </label>
+            </div>
+
             <button disabled={busy} className="primary" style={{ marginTop: 16 }}>
-              {busy ? 'Saving Changes…' : 'Save Changes'}
+              {busy ? 'Saving Vehicle & Chauffeur…' : 'Save Vehicle & Chauffeur'}
             </button>
           </form>
         </Modal>
@@ -1772,6 +1865,31 @@ function SettingsPage({ token }: { token: string }) {
             />
           </label>
         ))}
+
+        <div style={{ margin: '20px 0', padding: '16px 20px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <strong style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8, color: '#0f172a' }}>
+                ⚡ Direct Vehicle Booking & Auto-Confirmation
+                <span className="badge" style={{ background: form.directVehicleBooking ? '#ecfdf5' : '#f1f5f9', color: form.directVehicleBooking ? '#065f46' : '#475569', fontWeight: 700 }}>
+                  {form.directVehicleBooking ? '✓ Enabled' : 'Disabled'}
+                </span>
+              </strong>
+              <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                When enabled, customers view available vehicles directly and book with instant confirmation (no manual admin approval required). Assigned chauffeurs are automatically dispatched via WhatsApp. When disabled, bookings require manual admin assignment.
+              </p>
+            </div>
+            <button
+              type="button"
+              className={form.directVehicleBooking ? 'primary' : 'secondary'}
+              onClick={() => setForm({ ...form, directVehicleBooking: !form.directVehicleBooking })}
+              style={{ fontWeight: 600, padding: '8px 16px' }}
+            >
+              {form.directVehicleBooking ? 'Disable Direct Booking' : 'Enable Direct Booking'}
+            </button>
+          </div>
+        </div>
+
         <button disabled={busy} className="primary" style={{ marginTop: 14 }}>
           {busy ? 'Saving…' : 'Save Business Settings'}
         </button>

@@ -70,6 +70,15 @@ export interface Address {
   longitude?: number;
 }
 
+export interface VehicleDriverContact {
+  id?: string;
+  name: string;
+  phone: string;
+  license?: string;
+  rating?: number;
+  trips?: number;
+}
+
 export interface Vehicle {
   id: string;
   type: VehicleType;
@@ -78,6 +87,7 @@ export interface Vehicle {
   capacity: number;
   ac: boolean;
   status: 'Available' | 'On Trip' | 'Maintenance' | 'Inactive';
+  driver?: VehicleDriverContact;
 }
 
 export interface Driver {
@@ -174,6 +184,7 @@ export interface Booking {
   history: History[];
   createdAt: string;
   idempotencyKey: string;
+  directBooking?: boolean;
 }
 
 export interface DriverAssignment {
@@ -247,6 +258,7 @@ export interface Settings {
   apkUrl: string;
   apkVersion: string;
   apkSize: string;
+  directVehicleBooking?: boolean;
 }
 
 export interface AuditLog {

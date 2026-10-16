@@ -46,6 +46,7 @@ export const bookingCreateSchema = z.object({
   returnDate: z.string().optional(),
   stops: z.array(z.string()).optional(),
   vehicleType: z.enum(['Sedan', 'SUV', 'Tempo Traveller']),
+  vehicleId: z.string().optional(),
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
   phone: z.string().regex(phoneRegex, 'Enter a valid 10-digit Indian mobile number'),
   email: z.union([z.email('Enter a valid email address'), z.literal('')]).optional().default(''),
