@@ -27,9 +27,15 @@ import {
   FileText,
   Navigation,
   Share2,
-  Copy
+  Copy,
+  MessageSquare,
+  QrCode,
+  CheckCircle2,
+  Send,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
-import type { Booking, Driver, Vehicle, Pricing, Route, Notice, Settings, Customer, Store } from '../../shared-types/src/index';
+import type { Booking, Driver, Vehicle, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession } from '../../shared-types/src/index';
 import { transitions } from '../../shared-utils/src/index';
 import {
   Auth,
@@ -55,6 +61,7 @@ const navigation = [
   ['Vehicles', Car],
   ['Pricing', Tag],
   ['Reports', ChartNoAxesCombined],
+  ['WhatsApp', MessageSquare],
   ['Notifications', Bell],
   ['Settings', SettingsIcon],
 ] as const;
@@ -167,6 +174,8 @@ export default function AdminApp() {
             <PricingPage token={session.token} />
           ) : page === 'Reports' ? (
             <Reports token={session.token} />
+          ) : page === 'WhatsApp' ? (
+            <WhatsAppGatewayPage token={session.token} />
           ) : page === 'Notifications' ? (
             <Notifications token={session.token} />
           ) : (
@@ -937,6 +946,20 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#166534' }}>
               Offered to <strong>{waModal.driverName || 'Chauffeur'}</strong> ({waModal.driverPhone || ''})
             </p>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#dcfce7',
+              color: '#15803d',
+              padding: '4px 10px',
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 700,
+              marginTop: 8
+            }}>
+              <CheckCircle2 size={13} /> Automated WhatsApp Dispatch Active
+            </div>
           </div>
 
           <div style={{
@@ -1768,6 +1791,612 @@ function SettingsPage({ token }: { token: string }) {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} /> Operational & Active
           </span>
         </div>
+      </section>
+    </>
+  );
+}
+
+function WhatsAppGatewayPage({ token }: { token: string }) {
+  const [session, setSession] = useState<WhatsAppSession | null>(null);
+  const [history, setHistory] = useState<Notice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [pairingPhone, setPairingPhone] = useState('+91 98450 12345');
+  const [pairing, setPairing] = useState(false);
+  const [pairError, setPairError] = useState('');
+  const [pairSuccess, setPairSuccess] = useState('');
+  const [testPhone, setTestPhone] = useState('9845012345');
+  const [testMsg, setTestMsg] = useState('🚗 Hello from Miles & Moments! This is an automated WhatsApp dispatch test.');
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; id?: string; error?: string } | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const fetchStatus = async () => {
+    try {
+      const res = await api<WhatsAppSession>('/admin/whatsapp/status', { token });
+      setSession(res);
+      return res;
+    } catch {
+      return null;
+    }
+  };
+
+  const fetchHistory = async () => {
+    try {
+      const list = await api<Notice[]>('/admin/whatsapp/history', { token });
+      setHistory(list);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      const curr = await fetchStatus();
+      await fetchHistory();
+      if (mounted) setLoading(false);
+      if (curr && !curr.connected && curr.status === 'DISCONNECTED') {
+        try {
+          const qrRes = await api<WhatsAppSession>('/admin/whatsapp/generate-qr', { token, method: 'POST' });
+          if (mounted) setSession(qrRes);
+        } catch {
+          // ignore
+        }
+      }
+    })();
+
+    const timer = setInterval(() => {
+      fetchStatus();
+      fetchHistory();
+    }, 4000);
+
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, [token]);
+
+  const handleGenerateQR = async () => {
+    setGenerating(true);
+    setPairError('');
+    try {
+      const res = await api<WhatsAppSession>('/admin/whatsapp/generate-qr', { token, method: 'POST' });
+      setSession(res);
+    } catch (e) {
+      setPairError((e as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handlePairPhone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPairing(true);
+    setPairError('');
+    setPairSuccess('');
+    try {
+      const res = await api<{ success: boolean; session: WhatsAppSession }>('/admin/whatsapp/pair', {
+        token,
+        method: 'POST',
+        body: { phone: pairingPhone },
+      });
+      if (res.session) setSession(res.session);
+      setPairSuccess(`WhatsApp linked successfully with ${pairingPhone}! Automated dispatch is now active.`);
+      fetchHistory();
+    } catch (e) {
+      setPairError((e as Error).message);
+    } finally {
+      setPairing(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!window.confirm('Are you sure you want to unlink and disconnect this WhatsApp device? Automated messages will fall back to manual links until re-connected.')) return;
+    setDisconnecting(true);
+    try {
+      const res = await api<{ success: boolean; session: WhatsAppSession }>('/admin/whatsapp/disconnect', {
+        token,
+        method: 'POST',
+      });
+      if (res.session) setSession(res.session);
+      setPairSuccess('');
+    } catch (e) {
+      setPairError((e as Error).message);
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  const handleSendTest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSendingTest(true);
+    setTestResult(null);
+    try {
+      const res = await api<{ success: boolean; id?: string }>('/admin/whatsapp/send-test', {
+        token,
+        method: 'POST',
+        body: { phone: testPhone, message: testMsg },
+      });
+      setTestResult({ success: true, id: res.id });
+      fetchStatus();
+      fetchHistory();
+    } catch (e) {
+      setTestResult({ success: false, error: (e as Error).message });
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const isConnected = session?.connected === true;
+
+  return (
+    <>
+      <Heading
+        eyebrow="COMMUNICATION HUB"
+        title="WhatsApp Gateway & Automated Dispatch"
+        description="Scan the QR code to link your WhatsApp session. When connected, driver assignments, trip offers, and customer confirmations are dispatched automatically."
+        action={
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '6px 14px',
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: 700,
+                background: isConnected ? '#ecfdf5' : session?.status === 'SCAN_QR' ? '#fffbeb' : '#f1f5f9',
+                color: isConnected ? '#065f46' : session?.status === 'SCAN_QR' ? '#b45309' : '#64748b',
+                border: isConnected ? '1px solid #a7f3d0' : session?.status === 'SCAN_QR' ? '1px solid #fde68a' : '1px solid #cbd5e1',
+              }}
+            >
+              {isConnected ? <Wifi size={14} color="#10b981" /> : <WifiOff size={14} />}
+              {isConnected ? 'WhatsApp Connected & Active' : session?.status === 'SCAN_QR' ? 'Awaiting QR Scan' : 'Gateway Offline / Disconnected'}
+            </span>
+            <button className="secondary small" onClick={() => { fetchStatus(); fetchHistory(); }} title="Refresh Gateway Status">
+              <RefreshCw size={13} />
+            </button>
+          </div>
+        }
+      />
+
+      {loading && <Loading />}
+
+      {/* Top Banner */}
+      <section
+        style={{
+          background: isConnected
+            ? 'linear-gradient(135deg, #065f46 0%, #047857 100%)'
+            : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+          color: 'white',
+          borderRadius: 14,
+          padding: '24px 28px',
+          marginBottom: 24,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 18,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                background: isConnected ? '#10b981' : '#475569',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <MessageSquare size={22} color="white" />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20, color: 'white', fontWeight: 800 }}>
+                {isConnected ? 'Automated WhatsApp Gateway: Online' : 'WhatsApp Device Linking Required'}
+              </h2>
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: isConnected ? '#a7f3d0' : '#cbd5e1' }}>
+                {isConnected
+                  ? `Linked Device: ${session?.device || 'WhatsApp Web'} (${session?.phone || 'Primary'})`
+                  : 'Scan the QR code below or enter your WhatsApp number to activate real-time auto-dispatching.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: isConnected ? '#a7f3d0' : '#94a3b8' }}>
+              Messages Dispatched
+            </span>
+            <div style={{ fontSize: 26, fontWeight: 800, color: 'white' }}>{session?.messagesSent || 0}</div>
+          </div>
+          {isConnected && (
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              style={{
+                background: 'rgba(255,255,255,0.15)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.3)',
+                padding: '9px 16px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {disconnecting ? 'Unlinking…' : 'Unlink Device'}
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Main Grid: Device Link / QR Code & Test Dispatch */}
+      <div className="grid-two">
+        {/* Left Card: QR Scanner or Connected Details */}
+        <section className="card panel" style={{ display: 'flex', flexDirection: 'column' }}>
+          <h2>{isConnected ? 'Linked WhatsApp Session' : 'Scan QR Code to Connect'}</h2>
+          <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
+            {isConnected
+              ? 'Your WhatsApp account is securely connected. All dispatch events are executed without manual intervention.'
+              : 'Open WhatsApp on your phone and link this device in under 10 seconds.'}
+          </p>
+
+          {pairError && <ErrorBox message={pairError} />}
+          {pairSuccess && <p className="notice">{pairSuccess}</p>}
+
+          {!isConnected ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 12 }}>
+              {/* QR Container */}
+              <div
+                style={{
+                  background: 'white',
+                  padding: 16,
+                  borderRadius: 14,
+                  border: '2px solid #e2e8f0',
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  minHeight: 260,
+                  justifyContent: 'center',
+                  width: '100%',
+                  maxWidth: 290,
+                }}
+              >
+                {session?.qr ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={session.qr}
+                    alt="Scan WhatsApp QR"
+                    style={{ width: 220, height: 220, borderRadius: 8, display: 'block' }}
+                  />
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 30 }}>
+                    <Loading />
+                    <p style={{ fontSize: 12, color: '#64748b', marginTop: 10 }}>Generating WhatsApp pairing code…</p>
+                  </div>
+                )}
+
+                {session?.pairingCode && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      background: '#f1f5f9',
+                      padding: '5px 12px',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      letterSpacing: '0.06em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>Pairing Code: <strong>{session.pairingCode}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof navigator !== 'undefined' && session.pairingCode) {
+                          navigator.clipboard.writeText(session.pairingCode);
+                          setCopiedCode(true);
+                          setTimeout(() => setCopiedCode(false), 2000);
+                        }
+                      }}
+                      style={{ color: '#2563eb', padding: 2 }}
+                      title="Copy Pairing Code"
+                    >
+                      {copiedCode ? <Check size={12} /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  className="secondary small"
+                  onClick={handleGenerateQR}
+                  disabled={generating}
+                >
+                  <RefreshCw size={13} className={generating ? 'spin' : ''} />
+                  {generating ? 'Refreshing QR…' : 'Regenerate QR Code'}
+                </button>
+              </div>
+
+              {/* Step by Step Instructions */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  padding: '14px 18px',
+                  marginTop: 18,
+                  width: '100%',
+                  fontSize: 12,
+                }}
+              >
+                <strong style={{ display: 'block', marginBottom: 8, color: '#1e293b' }}>
+                  📱 How to link in 3 steps:
+                </strong>
+                <ol style={{ margin: 0, paddingLeft: 18, color: '#475569', lineHeight: 1.6 }}>
+                  <li>Open <strong>WhatsApp</strong> on your mobile device.</li>
+                  <li>Tap <strong>Settings</strong> (iOS) or <strong>Menu ⋮</strong> (Android) &gt; <strong>Linked Devices</strong>.</li>
+                  <li>Tap <strong>Link a Device</strong> and point your camera at the QR code above.</li>
+                </ol>
+              </div>
+
+              {/* Instant Link by Number */}
+              <form
+                onSubmit={handlePairPhone}
+                style={{
+                  width: '100%',
+                  marginTop: 18,
+                  paddingTop: 16,
+                  borderTop: '1px solid #e2e8f0',
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 8 }}>
+                  Direct Phone Pairing (Instant Connect)
+                </span>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <input
+                    type="text"
+                    required
+                    value={pairingPhone}
+                    onChange={(e) => setPairingPhone(e.target.value)}
+                    placeholder="+91 98450 12345"
+                    style={{ flex: 1, fontSize: 12 }}
+                  />
+                  <button type="submit" className="primary small" disabled={pairing}>
+                    {pairing ? 'Connecting…' : 'Link Phone'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div style={{ marginTop: 10 }}>
+              <div
+                style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: 12,
+                  padding: 20,
+                  marginBottom: 18,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      background: '#16a34a',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 16, color: '#14532d' }}>Device Paired & Connected</h3>
+                    <p style={{ margin: '2px 0 0', fontSize: 12, color: '#166534' }}>
+                      Ready to automatically dispatch WhatsApp messages.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Connected Number</span>
+                    <strong style={{ display: 'block', color: '#0f172a' }}>{session?.phone || 'Configured'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Client Device</span>
+                    <strong style={{ display: 'block', color: '#0f172a' }}>{session?.device || 'WhatsApp Web Gateway'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Connected At</span>
+                    <strong style={{ display: 'block', color: '#0f172a' }}>
+                      {session?.connectedAt ? new Date(session.connectedAt).toLocaleTimeString() : 'Active'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Last Message Sent</span>
+                    <strong style={{ display: 'block', color: '#0f172a' }}>
+                      {session?.lastSentAt ? new Date(session.lastSentAt).toLocaleTimeString() : 'Ready'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  className="danger-button small"
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                >
+                  <LogOut size={13} />
+                  {disconnecting ? 'Unlinking…' : 'Unlink / Disconnect Session'}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Right Card: Live Test Message Sender & Automations */}
+        <section className="card panel">
+          <h2>Send Live Test Message</h2>
+          <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
+            Verify that your WhatsApp gateway successfully sends real-time messages to any phone number.
+          </p>
+
+          {testResult && (
+            <div
+              style={{
+                background: testResult.success ? '#f0fdf4' : '#fef2f2',
+                border: testResult.success ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                padding: '12px 14px',
+                borderRadius: 8,
+                fontSize: 12,
+                color: testResult.success ? '#15803d' : '#b91c1c',
+                marginBottom: 16,
+              }}
+            >
+              {testResult.success
+                ? `✓ Message successfully dispatched! Message ID: ${testResult.id}`
+                : `✗ Failed to send message: ${testResult.error}`}
+            </div>
+          )}
+
+          <form onSubmit={handleSendTest}>
+            <label>
+              Recipient WhatsApp Number
+              <input
+                type="text"
+                required
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="9845012345 or +919845012345"
+              />
+            </label>
+
+            <label>
+              Message Content
+              <textarea
+                required
+                rows={4}
+                value={testMsg}
+                onChange={(e) => setTestMsg(e.target.value)}
+              />
+            </label>
+
+            <button type="submit" className="primary full" disabled={sendingTest}>
+              <Send size={15} />
+              {sendingTest ? 'Sending via WhatsApp…' : 'Send WhatsApp Message'}
+            </button>
+          </form>
+
+          <hr style={{ margin: '22px 0' }} />
+
+          <h3 style={{ fontSize: 14, marginBottom: 12 }}>⚡ Automated Trigger Pipelines</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
+            <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <strong style={{ color: '#1e293b', display: 'block', marginBottom: 2 }}>
+                1. Chauffeur Trip Offer
+              </strong>
+              <span style={{ color: '#64748b' }}>
+                Dispatches immediately when admin assigns a driver. Includes itinerary, passenger count, and 1-click accept/decline link.
+              </span>
+            </div>
+            <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <strong style={{ color: '#1e293b', display: 'block', marginBottom: 2 }}>
+                2. Customer Chauffeur Confirmation
+              </strong>
+              <span style={{ color: '#64748b' }}>
+                Dispatches to customer once driver accepts. Includes chauffeur name, vehicle registration number, and live tracking link.
+              </span>
+            </div>
+            <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <strong style={{ color: '#1e293b', display: 'block', marginBottom: 2 }}>
+                3. Passenger Journey Security OTP
+              </strong>
+              <span style={{ color: '#64748b' }}>
+                Provides 4-digit travel departure verification code sent directly to customer WhatsApp.
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Dispatched Logs Table */}
+      <section className="card panel" style={{ marginTop: 24 }}>
+        <div className="section-title">
+          <div>
+            <h2>Recent WhatsApp Activity & Dispatches</h2>
+            <p className="muted" style={{ fontSize: 12 }}>
+              Log of recent transactional notices and offers sent through the WhatsApp gateway.
+            </p>
+          </div>
+          <button className="secondary small" onClick={fetchHistory}>
+            <RefreshCw size={13} /> Refresh Activity Log
+          </button>
+        </div>
+
+        {history.length === 0 ? (
+          <Empty title="No WhatsApp messages dispatched yet">Trigger an assignment or send a test message above.</Empty>
+        ) : (
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Recipient</th>
+                  <th>Template / Type</th>
+                  <th>Message Preview</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <strong>{new Date(item.createdAt).toLocaleTimeString()}</strong>
+                      <small>{new Date(item.createdAt).toLocaleDateString()}</small>
+                    </td>
+                    <td>
+                      <strong>{item.recipientId || 'Recipient'}</strong>
+                      <small>{item.recipientType || 'general'}</small>
+                    </td>
+                    <td>
+                      <span className="badge">{item.template || 'Transaction'}</span>
+                    </td>
+                    <td style={{ maxWidth: 380, whiteSpace: 'normal', fontSize: 11, color: '#334155' }}>
+                      {item.message}
+                    </td>
+                    <td>
+                      <Badge value={item.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </>
   );

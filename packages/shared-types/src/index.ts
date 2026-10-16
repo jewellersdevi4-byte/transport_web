@@ -260,6 +260,18 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export interface WhatsAppSession {
+  connected: boolean;
+  status: 'DISCONNECTED' | 'SCAN_QR' | 'CONNECTED';
+  phone?: string;
+  device?: string;
+  connectedAt?: string;
+  qr?: string;
+  pairingCode?: string;
+  messagesSent: number;
+  lastSentAt?: string;
+}
+
 export interface Store {
   customers: Customer[];
   vehicles: Vehicle[];
@@ -272,6 +284,7 @@ export interface Store {
   settings: Settings;
   adminUsers?: AdminUser[];
   emailOtps?: EmailOtpRecord[];
+  whatsappSession?: WhatsAppSession;
 }
 
 export interface ApiResponse<T> {
