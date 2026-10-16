@@ -104,6 +104,10 @@ export const vehicleSchema = z.object({
   capacity: z.coerce.number().int().min(1).max(50),
   ac: z.boolean().default(true),
   status: z.enum(['Available', 'On Trip', 'Maintenance', 'Inactive']).default('Available'),
+  images: z.array(z.string()).max(5, 'Maximum 5 photos allowed per vehicle').optional().default([]),
+  driverName: z.string().optional(),
+  driverPhone: z.string().optional(),
+  driverLicense: z.string().optional(),
 });
 
 export const pricingRuleSchema = z.object({

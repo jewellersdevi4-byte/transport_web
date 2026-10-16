@@ -26,7 +26,8 @@ import {
   Calendar,
   Sparkles,
   ExternalLink,
-  CheckCircle2
+  CheckCircle2,
+  Camera,
 } from 'lucide-react';
 import type { Booking, Customer, Route, Settings, Vehicle } from '../../shared-types/src/index';
 import {
@@ -442,6 +443,8 @@ function BookingWizard({
   const [otpError, setOtpError] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(0);
   const [otpHint, setOtpHint] = useState('');
+  const [galleryModal, setGalleryModal] = useState<Quote | null>(null);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   useEffect(() => {
     if (otpCountdown > 0) {
@@ -806,40 +809,87 @@ function BookingWizard({
           </p>
           <div className="grid-three">
             {quotes.map((v) => (
-              <button
+              <div
                 key={v.id}
                 className={`vehicle-card ${quote?.id === v.id ? 'selected' : ''}`}
-                onClick={() => {
-                  setQuote(v);
-                  setStep(2);
-                }}
+                style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', textAlign: 'left' }}
               >
-                <div className="vehicle-illustration">
-                  <Car size={85} strokeWidth={1.2} />
-                </div>
-                <div className="section-title">
-                  <h3>{directBooking ? v.model : v.type}</h3>
-                  <Badge value="Available" />
-                </div>
-                <p className="muted">
-                  {directBooking ? `${v.type} · Reg: ${v.number}` : `${v.model} or verified equivalent`}
-                </p>
-                <div className="vehicle-features">
-                  <span><Users size={15} /> {v.capacity} passenger seats</span>
-                  <span><Wind size={15} /> {v.ac ? 'Climate Controlled AC' : 'Non-AC'}</span>
-                  <span><Luggage size={15} /> Luggage boot</span>
-                  {directBooking && v.driverName && (
-                    <span style={{ color: '#047857', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <CheckCircle2 size={14} /> Chauffeur: {v.driverName}
-                    </span>
+                <div style={{ position: 'relative', height: 160, width: '100%', background: '#0f172a' }}>
+                  {v.images && v.images.length > 0 ? (
+                    <img
+                      src={v.images[0]}
+                      alt={v.model}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#94a3b8' }}>
+                      <Car size={56} strokeWidth={1.2} />
+                    </div>
+                  )}
+                  {v.images && v.images.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setGalleryModal(v);
+                        setActivePhotoIdx(0);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        bottom: 8,
+                        right: 8,
+                        background: 'rgba(15,23,42,0.85)',
+                        color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.3)',
+                        padding: '4px 10px',
+                        borderRadius: 14,
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <Camera size={13} /> {v.images.length} Photos
+                    </button>
                   )}
                 </div>
-                <div className="section-title" style={{ marginTop: 12 }}>
-                  <span className="primary small" style={{ width: '100%', justifyContent: 'center' }}>
-                    Select ride <ArrowRight size={16} />
-                  </span>
+
+                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <div className="section-title">
+                    <h3>{directBooking ? v.model : v.type}</h3>
+                    <Badge value="Available" />
+                  </div>
+                  <p className="muted">
+                    {directBooking ? `${v.type} · Reg: ${v.number}` : `${v.model} or verified equivalent`}
+                  </p>
+                  <div className="vehicle-features">
+                    <span><Users size={15} /> {v.capacity} passenger seats</span>
+                    <span><Wind size={15} /> {v.ac ? 'Climate Controlled AC' : 'Non-AC'}</span>
+                    <span><Luggage size={15} /> Luggage boot</span>
+                    {directBooking && v.driverName && (
+                      <span style={{ color: '#047857', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <CheckCircle2 size={14} /> Chauffeur: {v.driverName}
+                      </span>
+                    )}
+                  </div>
+                  <div className="section-title" style={{ marginTop: 'auto', paddingTop: 12 }}>
+                    <button
+                      type="button"
+                      className="primary small"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                      onClick={() => {
+                        setQuote(v);
+                        setStep(2);
+                      }}
+                    >
+                      Select ride <ArrowRight size={16} />
+                    </button>
+                  </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
           {quotes.length === 0 && (
@@ -849,6 +899,62 @@ function BookingWizard({
                 Change search
               </button>
             </Empty>
+          )}
+
+          {galleryModal && (
+            <Modal title={`${galleryModal.model} (${galleryModal.images?.length || 0} Photos)`} onClose={() => setGalleryModal(null)}>
+              <div style={{ textAlign: 'center' }}>
+                {galleryModal.images && galleryModal.images.length > 0 && (
+                  <>
+                    <div style={{ height: 320, width: '100%', background: '#0f172a', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+                      <img
+                        src={galleryModal.images[activePhotoIdx]}
+                        alt={`Vehicle photo ${activePhotoIdx + 1}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', overflowX: 'auto', paddingBottom: 8 }}>
+                      {galleryModal.images.map((img, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setActivePhotoIdx(i)}
+                          style={{
+                            padding: 0,
+                            border: i === activePhotoIdx ? '2px solid #2563eb' : '2px solid transparent',
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            width: 64,
+                            height: 48,
+                            background: '#0f172a',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <img src={img} alt={`Thumb ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="muted" style={{ fontSize: '0.86rem' }}>
+                        Photo {activePhotoIdx + 1} of {galleryModal.images.length}
+                      </span>
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => {
+                          setQuote(galleryModal);
+                          setGalleryModal(null);
+                          setStep(2);
+                        }}
+                      >
+                        Select this Vehicle <ArrowRight size={16} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </Modal>
           )}
         </>
       )}

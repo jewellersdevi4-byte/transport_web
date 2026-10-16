@@ -87,6 +87,7 @@ export interface Vehicle {
   capacity: number;
   ac: boolean;
   status: 'Available' | 'On Trip' | 'Maintenance' | 'Inactive';
+  images?: string[];
   driver?: VehicleDriverContact;
 }
 

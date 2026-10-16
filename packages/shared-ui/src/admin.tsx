@@ -33,7 +33,8 @@ import {
   CheckCircle2,
   Send,
   Wifi,
-  WifiOff
+  WifiOff,
+  Camera,
 } from 'lucide-react';
 import type { Booking, Driver, Vehicle, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession } from '../../shared-types/src/index';
 import { transitions } from '../../shared-utils/src/index';
@@ -1088,10 +1089,48 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
   );
 }
 
+async function compressImageFile(file: File, maxWidth = 1000, maxHeight = 750, quality = 0.78): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new (window as any).Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(e.target?.result as string);
+        ctx.drawImage(img, 0, 0, width, height);
+        let dataUrl = canvas.toDataURL('image/webp', quality);
+        if (!dataUrl.startsWith('data:image/webp')) {
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function Fleet({ token }: { token: string }) {
   const r = useResource<(Vehicle & { driverName?: string; driverPhone?: string; driverLicense?: string })[]>('/admin/vehicles', token);
   const settings = useResource<Settings>('/admin/settings', token);
   const [query, setQuery] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [edit, setEdit] = useState<{
     id?: string;
     type: 'Sedan' | 'SUV' | 'Tempo Traveller';
@@ -1100,6 +1139,7 @@ function Fleet({ token }: { token: string }) {
     capacity: number;
     ac: boolean;
     status: 'Available' | 'On Trip' | 'Maintenance' | 'Inactive';
+    images: string[];
     driverName: string;
     driverPhone: string;
     driverLicense: string;
@@ -1115,10 +1155,65 @@ function Fleet({ token }: { token: string }) {
     capacity: 4,
     ac: true,
     status: 'Available' as const,
+    images: [] as string[],
     driverName: '',
     driverPhone: '',
     driverLicense: '',
   };
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !edit) return;
+    const remainingSlots = 5 - (edit.images?.length || 0);
+    if (remainingSlots <= 0) {
+      alert('Maximum 5 photos allowed per vehicle.');
+      return;
+    }
+    const toProcess = files.slice(0, remainingSlots);
+    setUploadingImage(true);
+    try {
+      const compressedList = await Promise.all(toProcess.map((f) => compressImageFile(f)));
+      setEdit((prev) => (prev ? {
+        ...prev,
+        images: [...(prev.images || []), ...compressedList],
+      } : null));
+    } catch (err) {
+      alert('Failed to process image: ' + (err as Error).message);
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
+  }
+
+  function handleAddImageUrl() {
+    if (!imageUrl.trim() || !edit) return;
+    if ((edit.images?.length || 0) >= 5) {
+      alert('Maximum 5 photos allowed per vehicle.');
+      return;
+    }
+    setEdit((prev) => (prev ? {
+      ...prev,
+      images: [...(prev.images || []), imageUrl.trim()],
+    } : null));
+    setImageUrl('');
+  }
+
+  function handleRemoveImage(index: number) {
+    if (!edit) return;
+    setEdit((prev) => (prev ? {
+      ...prev,
+      images: (prev.images || []).filter((_, i) => i !== index),
+    } : null));
+  }
+
+  function handleSetCover(index: number) {
+    if (!edit || index === 0) return;
+    const list = [...(edit.images || [])];
+    const item = list[index];
+    list.splice(index, 1);
+    list.unshift(item);
+    setEdit((prev) => (prev ? { ...prev, images: list } : null));
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -1222,70 +1317,104 @@ function Fleet({ token }: { token: string }) {
           {r.data
             ?.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()))
             .map((item) => (
-              <article key={item.id} className="card fleet-card">
-                <div className="section-title">
-                  <div className="vehicle-icon">
-                    <Car size={26} />
-                  </div>
-                  <Badge value={item.status} />
-                </div>
-                <h2>{item.model}</h2>
-                <p><strong>{item.number}</strong></p>
-                <p className="muted">
-                  {item.type} · {item.capacity} seats · {item.ac ? 'Climate Controlled AC' : 'Non-AC'}
-                </p>
-
-                <div style={{ margin: '12px 0', padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                  <p style={{ margin: '0 0 4px', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700 }}>
-                    ASSIGNED CHAUFFEUR
-                  </p>
-                  {item.driverName ? (
-                    <>
-                      <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
-                        👤 {item.driverName}
-                      </p>
-                      <p style={{ margin: '2px 0 0', color: '#059669', fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Phone size={13} /> +91 {item.driverPhone} (WhatsApp)
-                      </p>
-                      {item.driver && (
-                        <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.8rem' }}>
-                          ★ {item.driver.rating || 5.0} · {item.driver.trips || 0} completed trips
-                        </p>
-                      )}
-                      {(item.driverLicense || item.driver?.license) && (
-                        <p style={{ margin: '2px 0 0', color: '#94a3b8', fontSize: '0.76rem' }}>
-                          License: {item.driverLicense || item.driver?.license}
-                        </p>
-                      )}
-                    </>
+              <article key={item.id} className="card fleet-card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{ position: 'relative', height: 160, width: '100%', background: '#0f172a' }}>
+                  {item.images && item.images.length > 0 ? (
+                    <img
+                      src={item.images[0]}
+                      alt={item.model}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   ) : (
-                    <p style={{ margin: 0, color: '#d97706', fontSize: '0.86rem', fontWeight: 600 }}>
-                      ⚠️ No chauffeur contact attached
-                    </p>
+                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#94a3b8' }}>
+                      <Car size={42} strokeWidth={1.2} />
+                    </div>
+                  )}
+                  {item.images && item.images.length > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        bottom: 8,
+                        right: 8,
+                        background: 'rgba(15,23,42,0.8)',
+                        color: '#fff',
+                        padding: '2px 8px',
+                        borderRadius: 12,
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        backdropFilter: 'blur(4px)',
+                      }}
+                    >
+                      📷 {item.images.length} / 5 photos
+                    </span>
                   )}
                 </div>
+                <div style={{ padding: 16 }}>
+                  <div className="section-title">
+                    <div className="vehicle-icon">
+                      <Car size={26} />
+                    </div>
+                    <Badge value={item.status} />
+                  </div>
+                  <h2>{item.model}</h2>
+                  <p><strong>{item.number}</strong></p>
+                  <p className="muted">
+                    {item.type} · {item.capacity} seats · {item.ac ? 'Climate Controlled AC' : 'Non-AC'}
+                  </p>
 
-                <div className="actions">
-                  <button
-                    className="secondary"
-                    onClick={() => {
-                      setEdit({
-                        id: item.id,
-                        type: item.type,
-                        number: item.number,
-                        model: item.model,
-                        capacity: item.capacity,
-                        ac: item.ac,
-                        status: item.status,
-                        driverName: item.driverName || item.driver?.name || '',
-                        driverPhone: item.driverPhone || item.driver?.phone || '',
-                        driverLicense: item.driverLicense || item.driver?.license || '',
-                      });
-                      setError('');
-                    }}
-                  >
-                    Edit Vehicle & Chauffeur
-                  </button>
+                  <div style={{ margin: '12px 0', padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                    <p style={{ margin: '0 0 4px', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700 }}>
+                      ASSIGNED CHAUFFEUR
+                    </p>
+                    {item.driverName ? (
+                      <>
+                        <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
+                          👤 {item.driverName}
+                        </p>
+                        <p style={{ margin: '2px 0 0', color: '#059669', fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Phone size={13} /> +91 {item.driverPhone} (WhatsApp)
+                        </p>
+                        {item.driver && (
+                          <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.8rem' }}>
+                            ★ {item.driver.rating || 5.0} · {item.driver.trips || 0} completed trips
+                          </p>
+                        )}
+                        {(item.driverLicense || item.driver?.license) && (
+                          <p style={{ margin: '2px 0 0', color: '#94a3b8', fontSize: '0.76rem' }}>
+                            License: {item.driverLicense || item.driver?.license}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p style={{ margin: 0, color: '#d97706', fontSize: '0.86rem', fontWeight: 600 }}>
+                        ⚠️ No chauffeur contact attached
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="actions">
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        setEdit({
+                          id: item.id,
+                          type: item.type,
+                          number: item.number,
+                          model: item.model,
+                          capacity: item.capacity,
+                          ac: item.ac,
+                          status: item.status,
+                          images: item.images ? [...item.images] : [],
+                          driverName: item.driverName || item.driver?.name || '',
+                          driverPhone: item.driverPhone || item.driver?.phone || '',
+                          driverLicense: item.driverLicense || item.driver?.license || '',
+                        });
+                        setError('');
+                      }}
+                    >
+                      Edit Vehicle & Chauffeur
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
@@ -1335,6 +1464,82 @@ function Fleet({ token }: { token: string }) {
                   <option value="Inactive">Inactive</option>
                 </select>
               </label>
+            </div>
+
+            {/* VEHICLE PHOTOS GALLERY (UP TO 5 PHOTOS) */}
+            <div style={{ marginTop: 18, marginBottom: 18, padding: '14px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <p className="eyebrow" style={{ margin: 0 }}>VEHICLE PHOTOS (MAX 5 PHOTOS)</p>
+                <span className="badge" style={{ background: (edit.images?.length || 0) > 0 ? '#ecfdf5' : '#f1f5f9', color: (edit.images?.length || 0) > 0 ? '#065f46' : '#64748b' }}>
+                  {edit.images?.length || 0} / 5 Photos
+                </span>
+              </div>
+
+              {(edit.images?.length || 0) < 5 && (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#2563eb', color: '#fff', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.86rem' }}>
+                    <Camera size={16} /> {uploadingImage ? 'Compressing…' : 'Upload Photos (Gallery / Camera)'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={uploadingImage}
+                      onChange={handleImageUpload}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  <span className="muted" style={{ fontSize: '0.8rem' }}>or paste link:</span>
+                  <div style={{ display: 'flex', gap: 6, flex: 1, minWidth: 200 }}>
+                    <input
+                      type="url"
+                      placeholder="https://... image link"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      style={{ margin: 0, padding: '6px 10px', fontSize: '0.85rem' }}
+                    />
+                    <button type="button" className="secondary" onClick={handleAddImageUrl} style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                      Add
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {edit.images && edit.images.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10, marginTop: 8 }}>
+                  {edit.images.map((imgSrc, idx) => (
+                    <div key={idx} style={{ position: 'relative', height: 80, borderRadius: 6, overflow: 'hidden', border: idx === 0 ? '2px solid #2563eb' : '1px solid #cbd5e1', background: '#0f172a' }}>
+                      <img src={imgSrc} alt={`Vehicle photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      {idx === 0 && (
+                        <span style={{ position: 'absolute', top: 4, left: 4, background: '#2563eb', color: '#fff', fontSize: '0.65rem', fontWeight: 700, padding: '1px 5px', borderRadius: 4 }}>
+                          ★ Cover
+                        </span>
+                      )}
+                      {idx > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetCover(idx)}
+                          title="Set as Cover Photo"
+                          style={{ position: 'absolute', bottom: 4, left: 4, background: 'rgba(15,23,42,0.8)', color: '#fff', border: 'none', borderRadius: 3, padding: '2px 4px', fontSize: '0.65rem', cursor: 'pointer' }}
+                        >
+                          Make Cover
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        title="Remove photo"
+                        style={{ position: 'absolute', top: 4, right: 4, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                  No photos uploaded yet. Upload up to 5 photos (Front view, Interior, Rear, Side, Boot space) to showcase your vehicle to customers.
+                </p>
+              )}
             </div>
 
             <p className="eyebrow" style={{ marginTop: 18 }}>ASSIGNED CHAUFFEUR CONTACT</p>
