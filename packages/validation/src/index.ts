@@ -159,7 +159,13 @@ export const settingsUpdateSchema = z.object({
   cancellationHours: z.coerce.number().min(0).max(168),
   terms: z.string().min(10),
   privacy: z.string().min(10),
-  apkUrl: z.union([z.url(), z.literal('')]).default(''),
+  apkUrl: z
+    .string()
+    .trim()
+    .refine((s) => !s || s.startsWith('/') || /^https?:\/\//.test(s), 'Enter a valid URL or path')
+    .optional()
+    .default(''),
   apkVersion: z.string().default('1.0.0'),
   apkSize: z.string().default('24.8 MB'),
+  directVehicleBooking: z.boolean().optional(),
 });

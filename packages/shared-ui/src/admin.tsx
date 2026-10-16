@@ -1143,12 +1143,22 @@ function Fleet({ token }: { token: string }) {
     if (!settings.data) return;
     setToggleBusy(true);
     try {
+      const current = settings.data;
       await api('/admin/settings', {
         method: 'PUT',
         token,
         body: {
-          ...settings.data,
-          directVehicleBooking: !settings.data.directVehicleBooking,
+          businessName: current.businessName,
+          phone: current.phone,
+          email: current.email,
+          address: current.address,
+          cancellationHours: current.cancellationHours,
+          terms: current.terms,
+          privacy: current.privacy,
+          apkUrl: current.apkUrl || '',
+          apkVersion: current.apkVersion || '1.0.0',
+          apkSize: current.apkSize || '24.8 MB',
+          directVehicleBooking: !current.directVehicleBooking,
         },
       });
       settings.reload();
@@ -1841,7 +1851,7 @@ function SettingsPage({ token }: { token: string }) {
               {label(f.replace(/([A-Z])/g, ' $1'))}
               <input
                 required={f !== 'apkUrl'}
-                type={f === 'email' ? 'email' : f === 'cancellationHours' ? 'number' : f === 'apkUrl' ? 'url' : 'text'}
+                type={f === 'email' ? 'email' : f === 'cancellationHours' ? 'number' : 'text'}
                 value={form[f]}
                 onChange={(e) =>
                   setForm({
