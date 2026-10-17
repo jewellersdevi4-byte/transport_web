@@ -717,7 +717,7 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
           <Badge value={b.assignment} />
 
           {b.assignment === 'ASSIGNED' && (() => {
-            const driverTripUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/driver/trip?token=${b.assignmentToken || ''}`;
+            const driverTripUrl = `${(process.env.NEXT_PUBLIC_APP_URL || 'https://miles.devijewellers.in').replace(/\/+$/, '')}/driver/trip?token=${b.assignmentToken || ''}`;
             const assignedDriver = drivers.data?.find((d) => d.id === b.driverId);
             const assignedVehicle = vehicles.data?.find((v) => v.id === b.vehicleId);
             const waText = encodeURIComponent(
