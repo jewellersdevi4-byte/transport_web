@@ -2169,6 +2169,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [pairingPhone, setPairingPhone] = useState('+91 98450 12345');
   const [pairing, setPairing] = useState(false);
   const [pairError, setPairError] = useState('');
@@ -2236,6 +2237,19 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
       setPairError((e as Error).message);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleRestart = async () => {
+    setRestarting(true);
+    setPairError('');
+    try {
+      const res = await api<{ session: WhatsAppSession }>('/admin/whatsapp/restart', { token, method: 'POST' });
+      setSession(res.session);
+    } catch (e) {
+      setPairError((e as Error).message);
+    } finally {
+      setRestarting(false);
     }
   };
 
@@ -2331,6 +2345,11 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
             <button className="secondary small" onClick={() => { fetchStatus(); fetchHistory(); }} title="Refresh Gateway Status">
               <RefreshCw size={13} />
             </button>
+            {!isConnected && (
+              <button className="secondary small" onClick={handleRestart} disabled={restarting} title="Reconnect using the saved session">
+                <RefreshCw size={13} className={restarting ? 'spin' : ''} /> {restarting ? 'Reconnecting…' : 'Reconnect'}
+              </button>
+            )}
           </div>
         }
       />
