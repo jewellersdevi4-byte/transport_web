@@ -428,6 +428,7 @@ function BookingWizard({
   const [estimated, setEstimated] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState('');
   const [details, setDetails] = useState({
     name: '',
     phone: '',
@@ -493,7 +494,11 @@ function BookingWizard({
   useEffect(() => {
     if (token) {
       api<Customer>('/customer/profile', { token })
-        .then((c) => setDetails((d) => ({ ...d, name: c.name || d.name, phone: c.phone || d.phone, email: c.email || d.email })))
+        .then((c) => {
+          const email = c.email?.trim().toLowerCase() || '';
+          setVerifiedEmail(c.emailVerifiedAt ? email : '');
+          setDetails((d) => ({ ...d, name: c.name || d.name, phone: c.phone || d.phone, email: c.email || d.email }));
+        })
         .catch(() => {});
     }
   }, [token]);
@@ -582,7 +587,7 @@ function BookingWizard({
       return;
     }
 
-    if (token) {
+    if (token && verifiedEmail === cleanEmail) {
       await executeBooking(token);
       return;
     }
@@ -632,6 +637,7 @@ function BookingWizard({
           code: otpCode.trim(),
         },
       });
+      setVerifiedEmail(details.email.trim().toLowerCase());
       onLoginToken(authRes.token);
       await executeBooking(authRes.token);
     } catch (err) {
@@ -977,7 +983,7 @@ function BookingWizard({
               </label>
               <label>
                 Email Address (verification code & trip updates)
-                <input required type="email" readOnly={Boolean(token)} value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} />
+                <input required type="email" readOnly={Boolean(token && verifiedEmail && verifiedEmail === details.email.trim().toLowerCase())} value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} />
               </label>
               <label>
                 Passenger Count
