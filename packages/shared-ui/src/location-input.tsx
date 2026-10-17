@@ -14,28 +14,23 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
   useEffect(() => {
     setItems([]); setError(''); setActive(-1); setLoading(false);
     if (!open || placeId || value.trim().length < 2) return;
+    setLoading(true);
     const controller = new AbortController();
+    const deadline = setTimeout(() => { controller.abort(); setLoading(false); setError('Location search timed out. Edit the address to try again.'); }, 5000);
     const timer = setTimeout(() => {
       setLoading(true);
       apiClient<{ suggestions: Place[] }>(`/maps/suggestions?input=${encodeURIComponent(value.trim())}`, { signal: controller.signal })
         .then(r => { if (!controller.signal.aborted) setItems(r.suggestions || []); })
         .catch(e => { if (!controller.signal.aborted) setError(e.message); })
-        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+        .finally(() => { clearTimeout(deadline); if (!controller.signal.aborted) setLoading(false); });
     }, 200);
-    return () => { clearTimeout(timer); controller.abort(); };
+    return () => { clearTimeout(timer); clearTimeout(deadline); controller.abort(); };
   }, [value, placeId, open]);
   function select(place: Place) { onChange(place.label, place.placeId); setOpen(false); setItems([]); }
   function handleBlur(e: React.FocusEvent<HTMLDivElement>) {
     if (!e.currentTarget.contains(e.relatedTarget)) {
       setOpen(false);
-      if (!placeId && value.trim().length >= 2) {
-        if (items.length > 0) {
-          select(items[0]);
-        } else {
-          const fallbackId = 'place_' + Buffer.from(value.trim().toLowerCase()).toString('base64url').slice(0, 16);
-          onChange(value.trim(), fallbackId);
-        }
-      }
+
     }
   }
   return <div className="location-input" onBlur={handleBlur}>
@@ -52,10 +47,10 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
     {open && !placeId && value.trim().length >= 2 && <div className="location-suggestions">
       {loading && <p role="status">Searching locations…</p>}
       {error && <p role="alert">{error}</p>}
-      {!loading && !error && items.length === 0 && <p>Type to search, then select a location.</p>}
+      {!loading && !error && items.length === 0 && <p>No locations found. Try a street, landmark or building name with the city.</p>}
       <div id={`${id}-list`} role="listbox">{items.map((item, i) => <button type="button" key={item.placeId} id={`${id}-${i}`} role="option" aria-selected={active === i}
         onMouseDown={e => e.preventDefault()} onClick={() => select(item)}>{item.label}</button>)}</div>
-      {items.length > 0 && <span className="google-attribution" translate="no">Google Maps</span>}
+      {items.length > 0 && <a className="google-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" translate="no">© OpenStreetMap contributors</a>}
     </div>}
     {placeId && <small className="muted">Location selected</small>}
   </div>;
