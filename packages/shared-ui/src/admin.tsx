@@ -596,6 +596,7 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState('');
   const [message, setMessage] = useState('');
+  const [messageChannel, setMessageChannel] = useState<'WhatsApp' | 'SMS'>('WhatsApp');
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [waModal, setWaModal] = useState<{
@@ -606,6 +607,8 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
     message?: string;
     link?: string;
     waUrl?: string;
+    deliveryStatus?: 'QUEUED' | 'FAILED' | 'NOT_CONFIGURED';
+    deliveryError?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -904,6 +907,8 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
                     message: string;
                     link: string;
                     waUrl: string;
+                    deliveryStatus: 'QUEUED' | 'FAILED' | 'NOT_CONFIGURED';
+                    deliveryError?: string;
                   };
                 }>(`/admin/bookings/${id}/assign-driver`, {
                   token,
@@ -932,14 +937,14 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
       )}
 
       {waModal && (
-        <Modal title="Trip Offer Dispatched to Chauffeur" onClose={() => setWaModal(null)}>
+        <Modal title="Trip Offer Delivery Result" onClose={() => setWaModal(null)}>
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
             <div style={{
               width: 52,
               height: 52,
               borderRadius: '50%',
-              background: '#dcfce7',
-              color: '#16a34a',
+              background: waModal.deliveryStatus === 'QUEUED' ? '#dcfce7' : '#fee2e2',
+              color: waModal.deliveryStatus === 'QUEUED' ? '#16a34a' : '#b91c1c',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -947,7 +952,9 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
             }}>
               <Share2 size={26} />
             </div>
-            <h3 style={{ margin: 0, fontSize: 17, color: '#14532d' }}>Trip Offer Sent via WhatsApp</h3>
+            <h3 style={{ margin: 0, fontSize: 17, color: waModal.deliveryStatus === 'QUEUED' ? '#14532d' : '#991b1b' }}>
+              {waModal.deliveryStatus === 'QUEUED' ? 'WhatsApp accepted the trip offer' : 'Automatic WhatsApp send failed'}
+            </h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#166534' }}>
               Offered to <strong>{waModal.driverName || 'Chauffeur'}</strong> ({waModal.driverPhone || ''})
             </p>
@@ -955,15 +962,15 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              background: '#dcfce7',
-              color: '#15803d',
+              background: waModal.deliveryStatus === 'QUEUED' ? '#dcfce7' : '#fee2e2',
+              color: waModal.deliveryStatus === 'QUEUED' ? '#15803d' : '#991b1b',
               padding: '4px 10px',
               borderRadius: 20,
               fontSize: 11,
               fontWeight: 700,
               marginTop: 8
             }}>
-              <CheckCircle2 size={13} /> Automated WhatsApp Dispatch Active
+              <CheckCircle2 size={13} /> {waModal.deliveryStatus === 'QUEUED' ? 'Accepted by WhatsApp; delivery receipt not confirmed' : waModal.deliveryError || 'Message was not sent'}
             </div>
           </div>
 
@@ -992,7 +999,7 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
                 className="primary full"
                 style={{ background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none' }}
               >
-                <Share2 size={16} /> Open in WhatsApp Chat (wa.me)
+                <Share2 size={16} /> Open WhatsApp to Send Manually
               </a>
             )}
 
@@ -1064,6 +1071,14 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
 
       {notifyOpen && (
         <Modal title="Send Message to Customer" onClose={() => setNotifyOpen(false)}>
+          {error && <ErrorBox message={error} />}
+          <label>
+            Delivery Channel
+            <select value={messageChannel} onChange={(e) => setMessageChannel(e.target.value as 'WhatsApp' | 'SMS')}>
+              <option value="WhatsApp">WhatsApp</option>
+              <option value="SMS">SMS</option>
+            </select>
+          </label>
           <label>
             Message Content
             <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} />
@@ -1071,15 +1086,34 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
           <button
             className="primary"
             disabled={busy || !message}
-            onClick={() =>
-              action('/admin/notifications', {
+            onClick={async () => {
+              setBusy(true);
+              setError('');
+              try {
+                const result = await api<{ sent: number; failed?: Array<{ name: string; error: string }> }>('/admin/notifications', {
+                  token,
+                  method: 'POST',
+                  body: {
                 recipientType: 'customer',
                 recipientId: b.customerId,
-                channel: 'SMS',
+                bookingId: b.id,
+                channel: messageChannel,
                 template: 'Dispatch Notice',
                 message,
-              })
-            }
+                  },
+                });
+                if (result.failed?.length) {
+                  setError(result.failed.map((item) => `${item.name}: ${item.error}`).join(' '));
+                } else {
+                  setNotifyOpen(false);
+                }
+                r.reload();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
           >
             Send Message
           </button>
