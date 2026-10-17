@@ -1,6 +1,6 @@
 import type { NextConfig } from 'next';
 
-const LIVE_BACKEND_URL = 'https://transport-backend-pzlp.onrender.com';
+const LIVE_BACKEND_URL = 'https://transport.devijewellers.in';
 
 const config: NextConfig = {
   transpilePackages: [

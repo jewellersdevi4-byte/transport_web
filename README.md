@@ -34,3 +34,5 @@ Commit the generated `pnpm-lock.yaml` after installing dependencies for reproduc
 ## One website, two routes
 
 Customer: `/` (also `/download` and `/track`). Admin: `/admin`. Both use the same domain and Next.js server on port 3000. `/api/*` is proxied to the separate backend. Set API_INTERNAL_URL in apps/web/.env (local) or in the hosting environment, without a trailing slash or /api prefix. Build with `pnpm build`, then serve with `pnpm start`. Admin authentication and server-side role checks remain in place.
+
+Backend origin: `https://transport.devijewellers.in`. Use this origin (without `/api` or a trailing slash) for `NEXT_PUBLIC_API_URL` and `API_INTERNAL_URL` on web, and `EXPO_PUBLIC_API_URL` on mobile. Hosting environment overrides must match this value. Rebuild web and mobile apps after changing these variables.
