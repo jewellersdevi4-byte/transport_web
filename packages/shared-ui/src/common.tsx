@@ -24,15 +24,13 @@ export function Auth({admin=false,onLogin}:{admin?:boolean;onLogin:(token:string
   const [busy,setBusy]=useState(false);
   const [countdown,setCountdown]=useState(0);
   useEffect(()=>{if(countdown>0){const timer=setTimeout(()=>setCountdown(n=>n-1),1000);return()=>clearTimeout(timer);}},[countdown]);
-  const isPhone = !admin && /^[6-9]\d{9}$/.test(email.trim().replace(/^\+91/, '').replace(/\D/g, ''));
-  const cleanPhone = email.trim().replace(/^\+91/, '').replace(/\D/g, '');
   async function sendCode() {
     setBusy(true);setError('');
     try {
-      const body = isPhone ? { phone: cleanPhone } : { email: email.trim().toLowerCase() };
-      const res = await api<{ message?: string; code?: string; mockCode?: string; retryAfterSeconds?: number }>('/auth/customer/send-otp',{method:'POST',body});
-      setSent(true);setCode(res.code || res.mockCode || '');setCountdown(res.retryAfterSeconds || 30);
-      setHint(res.code || res.mockCode ? `Verification code: ${res.code || res.mockCode}` : (isPhone ? `Verification code sent to +91 ${cleanPhone}. Valid for 5 minutes.` : 'Check your email, including spam, for a six-digit code. Valid for 5 minutes.'));
+      const normalized=email.trim().toLowerCase();
+      const res=await api<{message?:string;code?:string;mockCode?:string;retryAfterSeconds?:number}>('/auth/customer/send-otp',{method:'POST',body:{email:normalized}});
+      setSent(true);setCode(res.code||res.mockCode||'');setCountdown(res.retryAfterSeconds||30);
+      setHint(res.code||res.mockCode?`Verification code: ${res.code||res.mockCode}`:'Check your email, including spam, for a six-digit code. Valid for 5 minutes.');
     } catch(e) {setError((e as Error).message);} finally {setBusy(false);}
   }
   async function submit(e:React.FormEvent) {
@@ -40,27 +38,26 @@ export function Auth({admin=false,onLogin}:{admin?:boolean;onLogin:(token:string
     if(!admin&&!sent){await sendCode();return;}
     setBusy(true);setError('');
     try {
-      const body = admin ? { login, password } : isPhone ? { phone: cleanPhone, code } : { email: email.trim().toLowerCase(), code };
-      const r=await api<{token:string}>(admin?'/auth/admin/login':'/auth/customer/verify-otp',{
-        method:'POST',body
-      });onLogin(r.token);
+      const body=admin?{login,password}:{email:email.trim().toLowerCase(),code};
+      const r=await api<{token:string}>(admin?'/auth/admin/login':'/auth/customer/verify-otp',{method:'POST',body});
+      onLogin(r.token);
     } catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   return <form className="auth-card card" onSubmit={submit}>
     <div className="brand-icon"><Car/></div>
     <p className="eyebrow">{admin?'OPERATIONS, SIMPLIFIED':'YOUR NEXT JOURNEY STARTS HERE'}</p>
     <h1>{admin?'Welcome back, dispatch.':'Let’s get you moving.'}</h1>
-    <p className="muted">{admin?'Sign in to manage your fleet and every journey.':'Sign in with an instant verification code sent to your phone or email.'}</p>
+    <p className="muted">{admin?'Sign in to manage your fleet and every journey.':'Sign in with a verification code sent to your email.'}</p>
     {error&&<ErrorBox message={error}/>}
-    <label>{admin?'Admin login':'Mobile number or email'}<input required type={admin?'text':isPhone?'tel':'text'} value={admin?login:email}
-      placeholder={admin?'Admin email or login':'10-digit mobile or email'} autoComplete={admin?'username':'email'}
+    <label>{admin?'Admin login':'Email address'}<input required type={admin?'text':'email'} value={admin?login:email}
+      placeholder={admin?'Admin email or login':'you@example.com'} autoComplete={admin?'username':'email'}
       onChange={e=>admin?setLogin(e.target.value):setEmail(e.target.value)} disabled={busy||(!admin&&sent)}/></label>
     {admin?<label>Password<input required type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/></label>:
       sent&&<label>Six-digit verification code<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))} autoComplete="one-time-code"/></label>}
     {hint&&<p className="notice" role="status">{hint}</p>}
     <button type="submit" className="primary full" disabled={busy}>{busy?'Please wait…':admin?'Sign in':sent?'Verify & continue':'Send verification code'}<ArrowRight size={18}/></button>
     {!admin&&sent&&<><button type="button" className="text-button" disabled={busy||countdown>0} onClick={()=>void sendCode()}>{countdown>0?`Resend in ${countdown}s`:'Resend code'}</button>
-    <button type="button" className="text-button" disabled={busy} onClick={()=>{setSent(false);setCode('');setHint('');setError('');}}>Change contact</button></>}
+    <button type="button" className="text-button" disabled={busy} onClick={()=>{setSent(false);setCode('');setHint('');setError('');}}>Change email</button></>}
     {admin&&<button type="button" className="text-button" onClick={async()=>{try{const r=await api<{message:string}>('/auth/admin/forgot-password',{method:'POST'});setHint(r.message);}catch(e){setError((e as Error).message);}}}>Forgot password?</button>}
   </form>;
 }

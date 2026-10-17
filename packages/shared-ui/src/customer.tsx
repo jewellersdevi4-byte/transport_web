@@ -573,7 +573,12 @@ function BookingWizard({
     }
     const cleanPhone = details.phone.replace(/\D/g, '');
     if (cleanPhone.length !== 10) {
-      setError('Please enter a valid 10-digit mobile number.');
+      setError('Please enter a valid 10-digit contact number for your trip.');
+      return;
+    }
+    const cleanEmail = details.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError('Enter a valid email address to receive your verification code.');
       return;
     }
 
@@ -590,8 +595,7 @@ function BookingWizard({
         {
           method: 'POST',
           body: {
-            phone: cleanPhone,
-            email: details.email?.trim() || undefined,
+            email: cleanEmail,
           },
         }
       );
@@ -600,13 +604,13 @@ function BookingWizard({
       setOtpHint(
         codeHint
           ? `Verification code: ${codeHint}`
-          : `We sent a 6-digit verification code to +91 ${cleanPhone}${details.email ? ` and ${details.email}` : ''}.`
+          : `We sent a 6-digit verification code to ${cleanEmail}.`
       );
       setOtpCode(codeHint || '');
       setOtpError('');
       setOtpModal(true);
     } catch (err) {
-      setError((err as Error).message || 'Failed to send verification code. Please check your phone number.');
+      setError((err as Error).message || 'Failed to send verification code. Please check your email address.');
     } finally {
       setBusy(false);
     }
@@ -614,7 +618,6 @@ function BookingWizard({
 
   async function verifyAndBook(e: React.FormEvent) {
     e.preventDefault();
-    const cleanPhone = details.phone.replace(/\D/g, '');
     if (!/^\d{6}$/.test(otpCode.trim())) {
       setOtpError('Please enter a valid 6-digit verification code.');
       return;
@@ -625,8 +628,7 @@ function BookingWizard({
       const authRes = await api<{ token: string; customer: any }>('/auth/customer/verify-otp', {
         method: 'POST',
         body: {
-          phone: cleanPhone,
-          email: details.email?.trim() || undefined,
+          email: details.email.trim().toLowerCase(),
           code: otpCode.trim(),
         },
       });
@@ -643,14 +645,13 @@ function BookingWizard({
     setOtpBusy(true);
     setOtpError('');
     try {
-      const cleanPhone = details.phone.replace(/\D/g, '');
+      const cleanEmail = details.email.trim().toLowerCase();
       const otpRes = await api<{ message?: string; code?: string; mockCode?: string; retryAfterSeconds?: number }>(
         '/auth/customer/send-otp',
         {
           method: 'POST',
           body: {
-            phone: cleanPhone,
-            email: details.email?.trim() || undefined,
+            email: cleanEmail,
           },
         }
       );
@@ -659,7 +660,7 @@ function BookingWizard({
       setOtpHint(
         codeHint
           ? `New verification code: ${codeHint}`
-          : `We resent the verification code to +91 ${cleanPhone}.`
+          : `We resent the verification code to ${cleanEmail}.`
       );
       if (codeHint) setOtpCode(codeHint);
     } catch (err) {
@@ -971,12 +972,12 @@ function BookingWizard({
                 <input required minLength={2} value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} />
               </label>
               <label>
-                10-Digit Mobile Number
+                Contact Phone Number
                 <input required pattern="[6-9][0-9]{9}" type="tel" value={details.phone} onChange={(e) => setDetails({ ...details, phone: e.target.value })} />
               </label>
               <label>
-                Email Address (for GST receipt)
-                <input type="email" value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} />
+                Email Address (verification code & trip updates)
+                <input required type="email" readOnly={Boolean(token)} value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} />
               </label>
               <label>
                 Passenger Count
@@ -1010,7 +1011,7 @@ function BookingWizard({
       )}
 
       {otpModal && (
-        <Modal title="Verify & Confirm Booking" onClose={() => setOtpModal(false)}>
+        <Modal title="Verify email & confirm booking" onClose={() => setOtpModal(false)}>
           <form onSubmit={verifyAndBook}>
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
               <div style={{
@@ -1026,9 +1027,9 @@ function BookingWizard({
               }}>
                 <ShieldCheck size={26} />
               </div>
-              <h3 style={{ margin: 0, fontSize: 17 }}>Quick Contact Verification</h3>
+              <h3 style={{ margin: 0, fontSize: 17 }}>Email Verification</h3>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>
-                Confirming reservation for <strong>+91 {details.phone.replace(/\D/g, '')}</strong>
+                We sent a sign-in code to <strong>{details.email}</strong>. Verify it to confirm your reservation.
               </p>
             </div>
 
@@ -1083,7 +1084,7 @@ function BookingWizard({
                 onClick={() => setOtpModal(false)}
                 style={{ fontSize: 13, color: 'var(--muted)' }}
               >
-                Change mobile number
+                Change email address
               </button>
             </div>
           </form>
