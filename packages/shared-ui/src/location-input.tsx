@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useId, useState } from 'react';
 import { apiClient } from '../../api-client/src/index';
-type Place = { placeId: string; label: string };
+type Place = { placeId: string; label: string; provider?: 'geoapify' | 'photon' };
 export function LocationInput({ value, placeId, onChange, placeholder }: {
   value: string; placeId?: string; onChange: (value: string, placeId: string) => void; placeholder: string;
 }) {
@@ -50,7 +50,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
       {!loading && !error && items.length === 0 && <p>No locations found. Try a street, landmark or building name with the city.</p>}
       <div id={`${id}-list`} role="listbox">{items.map((item, i) => <button type="button" key={item.placeId} id={`${id}-${i}`} role="option" aria-selected={active === i}
         onMouseDown={e => e.preventDefault()} onClick={() => select(item)}>{item.label}</button>)}</div>
-      {items.length > 0 && <a className="google-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" translate="no">© OpenStreetMap contributors</a>}
+      {items.length > 0 && <span className="google-attribution">{items.some(item => item.provider === 'geoapify') && <>Powered by <a href="https://www.geoapify.com/" target="_blank" rel="noreferrer">Geoapify</a> · </>}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" translate="no">© OpenStreetMap contributors</a></span>}
     </div>}
     {placeId && <small className="muted">Location selected</small>}
   </div>;
