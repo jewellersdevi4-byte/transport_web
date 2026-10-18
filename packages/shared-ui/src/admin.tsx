@@ -918,9 +918,6 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
                 setAssign(false);
                 r.reload();
                 if (res?.whatsapp) {
-                  if (typeof window !== 'undefined' && res.whatsapp.waUrl) {
-                    window.open(res.whatsapp.waUrl, '_blank');
-                  }
                   setWaModal(res.whatsapp);
                 }
               } catch (e) {
@@ -991,7 +988,7 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {waModal.waUrl && (
+            {waModal.waUrl && waModal.deliveryStatus !== 'QUEUED' && (
               <a
                 href={waModal.waUrl}
                 target="_blank"
