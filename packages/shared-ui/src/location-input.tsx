@@ -13,7 +13,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
   const [active, setActive] = useState(-1);
   useEffect(() => {
     setItems([]); setError(''); setActive(-1); setLoading(false);
-    if (!open || placeId || value.trim().length < 2) return;
+    if (!open || placeId || value.trim().length < 3) return;
     setLoading(true);
     const controller = new AbortController();
     const deadline = setTimeout(() => { controller.abort(); setLoading(false); setError('Location search timed out. Edit the address to try again.'); }, 5000);
@@ -23,7 +23,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
         .then(r => { if (!controller.signal.aborted) setItems(r.suggestions || []); })
         .catch(e => { if (!controller.signal.aborted) setError(e.message); })
         .finally(() => { clearTimeout(deadline); if (!controller.signal.aborted) setLoading(false); });
-    }, 200);
+    }, 350);
     return () => { clearTimeout(timer); clearTimeout(deadline); controller.abort(); };
   }, [value, placeId, open]);
   function select(place: Place) { onChange(place.label, place.placeId); setOpen(false); setItems([]); }
@@ -44,7 +44,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
         if (open && e.key === 'Enter' && active >= 0 && items[active]) { e.preventDefault(); select(items[active]); }
         else if (open && e.key === 'Enter' && items.length > 0) { e.preventDefault(); select(items[0]); }
       }}/>
-    {open && !placeId && value.trim().length >= 2 && <div className="location-suggestions">
+    {open && !placeId && value.trim().length >= 3 && <div className="location-suggestions">
       {loading && <p role="status">Searching locations…</p>}
       {error && <p role="alert">{error}</p>}
       {!loading && !error && items.length === 0 && <p>No locations found. Try a street, landmark or building name with the city.</p>}
