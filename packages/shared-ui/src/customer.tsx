@@ -66,6 +66,7 @@ type Quote = Vehicle & {
   driverName?: string;
   driverRating?: number;
   driverTrips?: number;
+  driverBaseLocation?: string;
 };
 
 export default function CustomerApp() {
@@ -877,9 +878,10 @@ function BookingWizard({
                     <span><Wind size={15} /> {v.ac ? 'Climate Controlled AC' : 'Non-AC'}</span>
                     <span><Luggage size={15} /> Luggage boot</span>
                     {directBooking && v.driverName && (
-                      <span style={{ color: '#047857', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <CheckCircle2 size={14} /> Chauffeur: {v.driverName}
-                      </span>
+                      <div style={{ color: '#047857', fontWeight: 600, display: 'grid', gap: 3 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={14} /> Chauffeur: {v.driverName}</span>
+                        <small style={{ color: '#64748b', fontWeight: 500 }}>★ {v.driverRating || 5} · {v.driverTrips || 0} completed trips{v.driverBaseLocation ? ` · Based in ${v.driverBaseLocation}` : ''}</small>
+                      </div>
                     )}
                   </div>
                   <div className="section-title" style={{ marginTop: 'auto', paddingTop: 12 }}>
@@ -901,7 +903,7 @@ function BookingWizard({
           </div>
           {quotes.length === 0 && (
             <Empty title="No vehicles available for the requested time.">
-              <p>Please adjust your date or pickup time.</p>
+              <p>No available driver is based within their service radius of this pickup. Try another pickup location or date, or contact dispatch.</p>
               <button className="primary" onClick={() => setStep(0)}>
                 Change search
               </button>

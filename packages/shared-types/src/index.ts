@@ -77,6 +77,11 @@ export interface VehicleDriverContact {
   license?: string;
   rating?: number;
   trips?: number;
+  baseLocation?: string;
+  baseLocationPlaceId?: string;
+  baseLatitude?: number;
+  baseLongitude?: number;
+  serviceRadiusKm?: number;
 }
 
 export interface Vehicle {
@@ -100,6 +105,11 @@ export interface Driver {
   status: 'Available' | 'On Trip' | 'Inactive';
   rating: number;
   trips: number;
+  baseLocation?: string;
+  baseLocationPlaceId?: string;
+  baseLatitude?: number;
+  baseLongitude?: number;
+  serviceRadiusKm?: number;
 }
 
 export interface Pricing {

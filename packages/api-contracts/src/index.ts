@@ -67,6 +67,10 @@ export const ENDPOINTS = {
 
 export interface QuoteItem extends Vehicle {
   fare: number;
+  driverName?: string;
+  driverRating?: number;
+  driverTrips?: number;
+  driverBaseLocation?: string;
 }
 
 export interface AvailableVehiclesResponse {

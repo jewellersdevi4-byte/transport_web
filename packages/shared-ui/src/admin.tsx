@@ -37,6 +37,7 @@ import {
   Camera,
 } from 'lucide-react';
 import type { Booking, Driver, Vehicle, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession } from '../../shared-types/src/index';
+import { LocationInput } from './location-input';
 import { transitions } from '../../shared-utils/src/index';
 import {
   Auth,
@@ -1174,6 +1175,9 @@ function Fleet({ token }: { token: string }) {
     driverName: string;
     driverPhone: string;
     driverLicense: string;
+    driverBaseLocation: string;
+    driverBaseLocationPlaceId: string;
+    driverServiceRadiusKm: number;
   } | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1190,6 +1194,9 @@ function Fleet({ token }: { token: string }) {
     driverName: '',
     driverPhone: '',
     driverLicense: '',
+    driverBaseLocation: '',
+    driverBaseLocationPlaceId: '',
+    driverServiceRadiusKm: 30,
   };
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1248,13 +1255,23 @@ function Fleet({ token }: { token: string }) {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!edit) return;
     setBusy(true);
     setError('');
     try {
+      if (!edit.driverName.trim() || !/^osm:-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?:/.test(edit.driverBaseLocationPlaceId)) {
+        throw new Error('Choose the driver’s base location from the location suggestions before saving.');
+      }
+      const coordinates = edit.driverBaseLocationPlaceId.match(/^osm:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?):/);
+      if (!coordinates) throw new Error('Select the driver’s base location from the suggestions.');
       await api(`/admin/vehicles${edit?.id ? `/${edit.id}` : ''}`, {
         method: edit?.id ? 'PUT' : 'POST',
         token,
-        body: edit,
+        body: {
+          ...edit,
+          driverBaseLatitude: Number(coordinates[1]),
+          driverBaseLongitude: Number(coordinates[2]),
+        },
       });
       setEdit(null);
       r.reload();
@@ -1410,6 +1427,9 @@ function Fleet({ token }: { token: string }) {
                             ★ {item.driver.rating || 5.0} · {item.driver.trips || 0} completed trips
                           </p>
                         )}
+                        <p style={{ margin: '3px 0 0', color: item.driver?.baseLocation ? '#64748b' : '#b45309', fontSize: '0.78rem' }}>
+                          {item.driver?.baseLocation ? `Based in ${item.driver.baseLocation} · ${item.driver.serviceRadiusKm || 30} km service radius` : 'Set a base location to include this driver in customer searches'}
+                        </p>
                         {(item.driverLicense || item.driver?.license) && (
                           <p style={{ margin: '2px 0 0', color: '#94a3b8', fontSize: '0.76rem' }}>
                             License: {item.driverLicense || item.driver?.license}
@@ -1439,6 +1459,9 @@ function Fleet({ token }: { token: string }) {
                           driverName: item.driverName || item.driver?.name || '',
                           driverPhone: item.driverPhone || item.driver?.phone || '',
                           driverLicense: item.driverLicense || item.driver?.license || '',
+                          driverBaseLocation: item.driver?.baseLocation || '',
+                          driverBaseLocationPlaceId: item.driver?.baseLocationPlaceId || '',
+                          driverServiceRadiusKm: item.driver?.serviceRadiusKm || 30,
                         });
                         setError('');
                       }}
@@ -1586,6 +1609,20 @@ function Fleet({ token }: { token: string }) {
               <label>
                 Commercial Driving License
                 <input placeholder="e.g. KA0120200012345" value={edit.driverLicense} onChange={(e) => setEdit({ ...edit, driverLicense: e.target.value })} />
+              </label>
+              <label style={{ gridColumn: '1 / -1' }}>
+                Driver base location (select a map suggestion)
+                <LocationInput
+                  value={edit.driverBaseLocation}
+                  placeId={edit.driverBaseLocationPlaceId}
+                  placeholder="Search town, locality or landmark"
+                  onChange={(driverBaseLocation, driverBaseLocationPlaceId) => setEdit({ ...edit, driverBaseLocation, driverBaseLocationPlaceId })}
+                />
+              </label>
+              <label>
+                Service radius (km)
+                <input type="number" min={1} max={250} required value={edit.driverServiceRadiusKm} onChange={(e) => setEdit({ ...edit, driverServiceRadiusKm: Number(e.target.value) })} />
+                <small className="muted">Customers outside this radius will not see this vehicle.</small>
               </label>
             </div>
 
