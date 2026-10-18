@@ -281,6 +281,7 @@ export interface WhatsAppSession {
   connectedAt?: string;
   qr?: string;
   pairingCode?: string;
+  lastError?: string;
   messagesSent: number;
   lastSentAt?: string;
 }

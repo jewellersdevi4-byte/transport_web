@@ -2442,6 +2442,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
           </p>
 
           {pairError && <ErrorBox message={pairError} />}
+          {!isConnected && session?.lastError && !pairError && <ErrorBox message={`WhatsApp disconnected: ${session.lastError}`} />}
           {pairSuccess && <p className="notice">{pairSuccess}</p>}
 
           {!isConnected ? (
@@ -2468,7 +2469,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
                   <img
                     src={session.qr}
                     alt="Scan WhatsApp QR"
-                    style={{ width: 220, height: 220, borderRadius: 8, display: 'block' }}
+                    style={{ width: 280, height: 280, maxWidth: '100%', objectFit: 'contain', display: 'block', imageRendering: 'pixelated' }}
                   />
                 ) : (
                   <div style={{ textAlign: 'center', padding: 30 }}>
