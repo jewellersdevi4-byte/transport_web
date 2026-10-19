@@ -469,7 +469,7 @@ function BookingTable({ bookings, open }: { bookings: Booking[]; open: (id: stri
                 </button>
                 {b.directBooking && (
                   <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontSize: '0.68rem', display: 'block', width: 'fit-content', marginTop: 2, fontWeight: 700 }}>
-                    ⚡ Direct
+                    Direct booking
                   </span>
                 )}
               </td>
@@ -725,14 +725,14 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
             const assignedDriver = drivers.data?.find((d) => d.id === b.driverId);
             const assignedVehicle = vehicles.data?.find((v) => v.id === b.vehicleId);
             const waText = encodeURIComponent(
-              `🚗 *Miles & Moments — New Trip Offer*\n\n` +
+              `*Miles & Moments — New Trip Offer*\n\n` +
               `*Booking ID:* #${b.bookingNumber}\n` +
               `*Pickup:* ${b.pickup}\n` +
               `*Drop:* ${b.drop}\n` +
               `*Date & Time:* ${b.date} at ${b.time}\n` +
               `*Vehicle:* ${assignedVehicle?.model || b.vehicleType} (${assignedVehicle?.number || ''})\n` +
               `*Passengers:* ${b.passengers} | *Luggage:* ${b.luggage}\n\n` +
-              `👉 *Tap link to review & accept/decline:* \n${driverTripUrl}\n\n` +
+              `*Review and accept or decline:* \n${driverTripUrl}\n\n` +
               `*(Link valid for 30 minutes)*`
             );
             const waUrl = `https://wa.me/91${assignedDriver?.phone?.replace(/\D/g, '').slice(-10) || ''}?text=${waText}`;
@@ -1393,7 +1393,7 @@ function Fleet({ token }: { token: string }) {
                         backdropFilter: 'blur(4px)',
                       }}
                     >
-                      📷 {item.images.length} / 5 photos
+                      {item.images.length} / 5 photos
                     </span>
                   )}
                 </div>
@@ -1417,7 +1417,7 @@ function Fleet({ token }: { token: string }) {
                     {item.driverName ? (
                       <>
                         <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
-                          👤 {item.driverName}
+                          {item.driverName}
                         </p>
                         <p style={{ margin: '2px 0 0', color: '#059669', fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: 4 }}>
                           <Phone size={13} /> +91 {item.driverPhone} (WhatsApp)
@@ -1438,7 +1438,7 @@ function Fleet({ token }: { token: string }) {
                       </>
                     ) : (
                       <p style={{ margin: 0, color: '#d97706', fontSize: '0.86rem', fontWeight: 600 }}>
-                        ⚠️ No chauffeur contact attached
+                        No chauffeur contact attached
                       </p>
                     )}
                   </div>
@@ -2153,7 +2153,7 @@ function SettingsPage({ token }: { token: string }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 260 }}>
               <strong style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8, color: '#0f172a' }}>
-                ⚡ Direct Vehicle Booking & Auto-Confirmation
+                Direct vehicle booking & auto-confirmation
                 <span className="badge" style={{ background: form.directVehicleBooking ? '#ecfdf5' : '#f1f5f9', color: form.directVehicleBooking ? '#065f46' : '#475569', fontWeight: 700 }}>
                   {form.directVehicleBooking ? '✓ Enabled' : 'Disabled'}
                 </span>
@@ -2209,7 +2209,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
   const [pairError, setPairError] = useState('');
   const [pairSuccess, setPairSuccess] = useState('');
   const [testPhone, setTestPhone] = useState('9845012345');
-  const [testMsg, setTestMsg] = useState('🚗 Hello from Miles & Moments! This is an automated WhatsApp dispatch test.');
+  const [testMsg, setTestMsg] = useState('Hello from Miles & Moments! This is an automated WhatsApp dispatch test.');
   const [sendingTest, setSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; id?: string; error?: string } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -2573,7 +2573,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
                 }}
               >
                 <strong style={{ display: 'block', marginBottom: 8, color: '#1e293b' }}>
-                  📱 How to link in 3 steps:
+                  How to link in 3 steps:
                 </strong>
                 <ol style={{ margin: 0, paddingLeft: 18, color: '#475569', lineHeight: 1.6 }}>
                   <li>Open <strong>WhatsApp</strong> on your mobile device.</li>
@@ -2741,7 +2741,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
 
           <hr style={{ margin: '22px 0' }} />
 
-          <h3 style={{ fontSize: 14, marginBottom: 12 }}>⚡ Automated Trigger Pipelines</h3>
+          <h3 style={{ fontSize: 14, marginBottom: 12 }}>Automated message triggers</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
             <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
               <strong style={{ color: '#1e293b', display: 'block', marginBottom: 2 }}>

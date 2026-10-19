@@ -48,3 +48,24 @@
 .map-confirm-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;background:#2563eb;color:#fff;border:0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
 .map-confirm-btn:hover{background:#1d4ed8}
 .map-confirm-btn:disabled{opacity:.6;cursor:not-allowed}
+/* Refined booking and map controls */
+:root{--blue:#1d5f59;--ink:#172b35;--muted:#718187;--line:#e4ebe8;--bg:#f7f9f8}
+.customer-header{border-bottom-color:#e8eeeb}
+.booking-panel,.card,.detail-card{border-color:#e4ebe8;box-shadow:0 12px 36px rgba(21,49,44,.055)}
+.primary{background:#1d5f59;box-shadow:0 5px 13px rgba(29,95,89,.16)}
+.primary:hover{background:#174e49}
+.customer-header nav button.active,.text-button,.eyebrow{color:#1d5f59}
+.location-btn-link{color:#1d5f59;border-radius:8px;padding:7px 9px}
+.location-btn-link:hover{background:#edf4f1;color:#174e49}
+.map-modal-content{border:1px solid #e4ebe8;border-radius:18px;overflow:hidden;box-shadow:0 28px 90px rgba(16,36,58,.2)}
+.map-modal-header{padding:16px 20px;background:#fff}
+.map-modal-header h3{display:flex;align-items:center;gap:9px;color:#172b35}
+.map-modal-close{display:grid;place-items:center;width:36px;height:36px;border-radius:10px}
+.map-modal-close:hover{background:#edf4f1}
+.map-modal-footer{background:#fff}
+.map-address-banner{border:1px solid #e4ebe8;border-radius:12px;background:#f7f9f8}
+.premium-map-pin{position:relative;width:28px;height:36px;filter:drop-shadow(0 3px 5px rgba(15,35,31,.28))}
+.premium-map-pin:before{content:"";position:absolute;left:3px;top:1px;width:22px;height:22px;background:#1d5f59;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg)}
+.premium-map-pin span{position:absolute;left:11px;top:8px;width:7px;height:7px;background:#fff;border-radius:50%;z-index:1}
+.route-art{background:linear-gradient(145deg,#f0f5f3,#e0ebe7)}
+.route-art>span{color:#1d5f59}

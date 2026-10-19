@@ -273,7 +273,7 @@ export function DriverTripView() {
               <ShieldCheck size={26} />
             </div>
             <div style={{ fontWeight: 800, fontSize: 18, color: '#14532d' }}>
-              🎉 Trip Completed • Customer Dropped
+              Trip completed <span aria-hidden="true">·</span> Customer dropped off
             </div>
             <p style={{ fontSize: 13, marginTop: 4, color: '#15803d' }}>
               Trip reference #{data.bookingNumber} is marked completed. You and your vehicle are now marked <strong>Available</strong> for new bookings.
@@ -283,7 +283,7 @@ export function DriverTripView() {
           <div style={{ background: '#ecfdf5', border: '1.5px solid #34d399', borderRadius: 12, padding: '14px 16px', marginBottom: 18, color: '#065f46' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: 16 }}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 0 3px #a7f3d0' }} />
-              🚗 Ride in Progress • En Route
+              Ride in progress <span aria-hidden="true">·</span> En route
             </div>
             <p style={{ fontSize: 13, marginTop: 4, color: '#047857' }}>
               Passenger is on board. Live GPS location is active and streaming to dispatch and customer.

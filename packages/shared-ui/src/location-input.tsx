@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
+import { LocateFixed, MapPin, Map, ExternalLink, X } from 'lucide-react';
 import { apiClient } from '../../api-client/src/index';
 
 type Place = {
@@ -112,7 +113,7 @@ function MapPickerModal({
 
       const customIcon = L.divIcon({
         className: 'custom-map-marker',
-        html: '<div style="font-size:30px;line-height:1;transform:translate(-50%,-100%);filter:drop-shadow(0 3px 6px rgba(0,0,0,0.4));">📍</div>',
+        html: '<div class="premium-map-pin"><span></span></div>',
         iconSize: [30, 30],
         iconAnchor: [0, 0],
       });
@@ -189,13 +190,13 @@ function MapPickerModal({
     <div className="map-modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="map-modal-content">
         <div className="map-modal-header">
-          <h3>📍 Pick Location on Map</h3>
-          <button type="button" className="map-modal-close" onClick={onClose} aria-label="Close">✕</button>
+          <h3><MapPin size={18} /> Pick location on map</h3>
+          <button type="button" className="map-modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
         <div ref={mapContainerRef} className="map-canvas-container" />
         <div className="map-modal-footer">
           <div className="map-address-banner">
-            <span>📍</span>
+            <MapPin size={16} />
             <div>
               <strong>{loadingAddress ? 'Detecting address…' : address}</strong>
               <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
@@ -205,7 +206,7 @@ function MapPickerModal({
           </div>
           <div className="map-modal-actions">
             <button type="button" className="map-locate-btn" onClick={locateMe} disabled={locating}>
-              {locating ? 'Locating…' : '🎯 Locate Me (GPS)'}
+              {locating ? 'Locating…' : <><LocateFixed size={15} /> Locate me (GPS)</>}
             </button>
             <button
               type="button"
@@ -378,7 +379,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
           disabled={locating}
           title="Auto-detect GPS location"
         >
-          {locating ? 'Detecting location…' : '🎯 Use current location'}
+          {locating ? 'Detecting location…' : <><LocateFixed size={15} /> Use current location</>}
         </button>
 
         <button
@@ -387,7 +388,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
           onClick={() => { setOpen(false); setMapOpen(true); }}
           title="Choose exact spot with draggable pin"
         >
-          🗺️ Pick on map
+          <Map size={16} /> Pick on map
         </button>
 
         <button
@@ -396,7 +397,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
           onClick={openGoogleMaps}
           title="Open Google Maps to copy link"
         >
-          📍 Open Google Maps
+          <ExternalLink size={15} /> Open Google Maps
         </button>
       </div>
 
@@ -418,7 +419,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
                 disabled={locating}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}
               >
-                <span style={{ fontSize: 18 }}>🎯</span>
+                  <ExternalLink size={18} />
                 <div>
                   <strong style={{ display: 'block', fontSize: 13, color: '#0284c7' }}>Use current location</strong>
                   <span style={{ fontSize: 12, color: '#64748b' }}>Auto-detect device GPS location</span>
@@ -430,7 +431,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
                 onClick={() => { setOpen(false); setMapOpen(true); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}
               >
-                <span style={{ fontSize: 18 }}>🗺️</span>
+                <Map size={18} />
                 <div>
                   <strong style={{ display: 'block', fontSize: 13, color: '#0f172a' }}>Pick on map</strong>
                   <span style={{ fontSize: 12, color: '#64748b' }}>Drag pin or click map to choose exact spot</span>
@@ -442,7 +443,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
                 onClick={openGoogleMaps}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}
               >
-                <span style={{ fontSize: 18 }}>📍</span>
+                <LocateFixed size={18} />
                 <div>
                   <strong style={{ display: 'block', fontSize: 13, color: '#0f172a' }}>Open Google Maps</strong>
                   <span style={{ fontSize: 12, color: '#64748b' }}>Find in Google Maps, copy link, and paste here</span>
@@ -470,7 +471,7 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
                     onMouseDown={e => e.preventDefault()}
                     onClick={() => select(item)}
                   >
-                    {item.provider === 'google_maps_link' || item.provider === 'coordinates' ? `📍 ${item.label}` : item.label}
+                    {item.provider === 'google_maps_link' || item.provider === 'coordinates' ? <><MapPin size={14} /> {item.label}</> : item.label}
                   </button>
                 ))}
               </div>

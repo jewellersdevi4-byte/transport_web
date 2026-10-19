@@ -231,12 +231,12 @@ export default function CustomerApp() {
                     }}
                   >
                     <div className="route-art">
-                      <span>{['✈', '♜', '⌂'][i % 3]}</span>
+                      <span><Car size={42} strokeWidth={1.5} /></span>
                       <p>{['AIRPORT RUNWAY EXPRESS', 'HERITAGE HIGHWAY', 'SCENIC HILL ESCAPE'][i % 3]}</p>
                     </div>
                     <div className="route-body">
                       <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
-                      <p>{r.distance} km · Sanitized private chauffeur</p>
+                      <p>{r.distance} km · Private chauffeur service</p>
                       <div className="section-title">
                         <span><strong>{r.distance} km approx.</strong></span>
                         <ArrowUpRight size={20} />
@@ -317,7 +317,7 @@ export default function CustomerApp() {
               {(config.data?.routes || []).map((r, i) => (
                 <div key={r.id} className={`route-card route-${i}`}>
                   <div className="route-art">
-                    <span>{['✈', '♜', '⌂'][i % 3]}</span>
+                    <span><Car size={42} strokeWidth={1.5} /></span>
                     <p>{r.origin.toUpperCase()} → {r.destination.toUpperCase()}</p>
                   </div>
                   <div className="route-body">
@@ -1186,7 +1186,7 @@ function TrackTripInline({ onOpenBooking }: { onOpenBooking: (id: string) => voi
             <div style={{ background: '#ecfdf5', border: '1.5px solid #34d399', borderRadius: 12, padding: '14px 16px', margin: '14px 0', color: '#065f46' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 15 }}>
                 <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 0 3px #a7f3d0' }} />
-                🚗 Ride in Progress • Chauffeur En Route
+                Ride in progress <span aria-hidden="true">·</span> Chauffeur en route
               </div>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#047857' }}>
                 Your chauffeur {trip.driver?.name} has started the trip towards <strong>{trip.drop}</strong>. Settle the fare directly with the driver after drop-off.
@@ -1197,7 +1197,7 @@ function TrackTripInline({ onOpenBooking }: { onOpenBooking: (id: string) => voi
           {trip.status === 'COMPLETED' && (
             <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12, padding: '14px 16px', margin: '14px 0', color: '#166534' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 15 }}>
-                <Check size={18} /> ✅ Trip Completed • Safely Dropped Off
+                <Check size={18} /> Trip completed <span aria-hidden="true">·</span> Safely dropped off
               </div>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#15803d' }}>
                 You have arrived at your destination. Thank you for traveling with Miles & Moments!
