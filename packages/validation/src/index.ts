@@ -6,8 +6,8 @@ export const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const tripSearchSchema = z
   .object({
-    pickup: z.string().trim().min(3, 'Pickup location must be at least 3 characters').max(200),
-    drop: z.string().trim().min(3, 'Destination must be at least 3 characters').max(200),
+    pickup: z.string().trim().min(3, 'Pickup location must be at least 3 characters').max(500),
+    drop: z.string().trim().min(3, 'Destination must be at least 3 characters').max(500),
     date: z.string().regex(dateRegex, 'Date must be formatted as YYYY-MM-DD'),
     time: z.string().regex(timeRegex, 'Time must be formatted as HH:mm'),
     tripType: z.enum(['ONE_WAY', 'ROUND_TRIP', 'MULTI_CITY']).default('ONE_WAY'),
@@ -38,8 +38,8 @@ export const tripSearchSchema = z
   });
 
 export const bookingCreateSchema = z.object({
-  pickup: z.string().trim().min(3, 'Pickup is required'),
-  drop: z.string().trim().min(3, 'Drop destination is required'),
+  pickup: z.string().trim().min(3, 'Pickup is required').max(500),
+  drop: z.string().trim().min(3, 'Drop destination is required').max(500),
   date: z.string().regex(dateRegex, 'Valid date is required'),
   time: z.string().regex(timeRegex, 'Valid time is required'),
   tripType: z.enum(['ONE_WAY', 'ROUND_TRIP', 'MULTI_CITY']),

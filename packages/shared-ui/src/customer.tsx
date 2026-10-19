@@ -714,13 +714,13 @@ function BookingWizard({
           <div className="search-grid">
             <label>
               <span><MapPin size={15} /> Pickup location</span>
-              <LocationInput value={search.pickup} placeId={search.pickupPlaceId} placeholder="Search pickup address"
+              <LocationInput value={search.pickup} placeId={search.pickupPlaceId} placeholder="Search pickup address or paste Google Maps link"
                 onChange={(value, placeId) => setSearch({ ...search, pickup: value, pickupPlaceId: placeId })} />
             </label>
 
             <label>
               <span><MapPin size={15} /> Destination</span>
-              <LocationInput value={search.drop} placeId={search.dropPlaceId} placeholder="Search destination address"
+              <LocationInput value={search.drop} placeId={search.dropPlaceId} placeholder="Search destination address or paste Google Maps link"
                 onChange={(value, placeId) => setSearch({ ...search, drop: value, dropPlaceId: placeId })} />
             </label>
 
@@ -770,7 +770,7 @@ function BookingWizard({
                 <div key={i} className="stop-input-row">
                   <label>
                     <span><MapPin size={15} /> Stop {i + 1}</span>
-                    <LocationInput value={stop} placeId={search.stopPlaceIds?.[i]} placeholder={`Search stop ${i + 1}`}
+                    <LocationInput value={stop} placeId={search.stopPlaceIds?.[i]} placeholder={`Search stop ${i + 1} or paste Google Maps link`}
                       onChange={(value, placeId) => { const stops = [...search.stops]; const ids = [...(search.stopPlaceIds || [])]; stops[i] = value; ids[i] = placeId; setSearch({...search, stops, stopPlaceIds: ids}); }} />
                   </label>
                   {search.stops.length > 1 && (
