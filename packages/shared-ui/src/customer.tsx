@@ -420,6 +420,9 @@ function BookingWizard({
   const [searchMode, setSearchMode] = useState<'route' | 'pickup'>('route');
   const [pickupOnlyResults, setPickupOnlyResults] = useState(false);
   const [preferredVehicleId, setPreferredVehicleId] = useState('');
+  const [packageSelections, setPackageSelections] = useState<Record<string, string>>({});
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [extraHours, setExtraHours] = useState(0);
   const [step, setStep] = useState(0);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -574,6 +577,8 @@ function BookingWizard({
           ...details,
           vehicleType: quote?.type,
           vehicleId: quote?.id,
+          packageId: selectedPackageId || undefined,
+          extraHours: selectedPackageId ? extraHours : undefined,
           idempotencyKey: key,
         },
       });
@@ -898,7 +903,7 @@ function BookingWizard({
                     <Badge value="Available" />
                   </div>
                   <p className="muted">
-                    {directBooking ? `${v.type} · Reg: ${v.number}` : `${v.model} or verified equivalent`}
+                    {directBooking ? `${v.type}${v.number ? ` · Reg: ${v.number}` : ''}` : `${v.model} or verified equivalent`}
                   </p>
                   <div className="vehicle-features">
                     <span><Users size={15} /> {v.capacity} passenger seats</span>
@@ -911,14 +916,23 @@ function BookingWizard({
                       </div>
                     )}
                   </div>
+                  {v.packages && v.packages.length > 0 && <div className="vehicle-packages">
+                    <p className="eyebrow">BOOKING PACKAGES</p>
+                    {v.packages.map((pkg) => <button key={pkg.id} type="button" className={`package-option ${packageSelections[v.id] === pkg.id ? 'selected' : ''}`} onClick={() => setPackageSelections({ ...packageSelections, [v.id]: pkg.id })}>
+                      <strong>{pkg.name}</strong><span>{pkg.includedHours} hr · {pkg.includedKm} km</span><b>{money(pkg.estimatedFare ?? pkg.price)}</b>
+                      <small>Extra km {money(pkg.extraKmRate)}/km · extra hour {money(pkg.extraHourRate)}/hr{pkg.tollsParkingExtra ? ' · tolls & parking extra' : ''}</small>
+                    </button>)}
+                  </div>}
                   <div className="section-title" style={{ marginTop: 'auto', paddingTop: 12 }}>
                     <button
                       type="button"
                       className="primary small"
                       style={{ width: '100%', justifyContent: 'center' }}
+                      disabled={!pickupOnlyResults && Boolean(v.packages?.length) && !packageSelections[v.id]}
                       onClick={() => {
                         if (pickupOnlyResults) {
                           setPreferredVehicleId(v.id);
+                          setSelectedPackageId(packageSelections[v.id] || v.packages?.[0]?.id || '');
                           setSearch((current) => ({ ...current, drop: '', dropPlaceId: '', tripType: 'ONE_WAY', stops: [], stopPlaceIds: [] }));
                           setSearchMode('route');
                           setPickupOnlyResults(false);
@@ -926,11 +940,13 @@ function BookingWizard({
                           setStep(0);
                         } else {
                           setQuote(v);
+                          setSelectedPackageId(packageSelections[v.id] || '');
+                          setExtraHours(0);
                           setStep(2);
                         }
                       }}
                     >
-                      {pickupOnlyResults ? 'Use this car' : 'Select ride'} <ArrowRight size={16} />
+                      {pickupOnlyResults ? 'Use this car' : v.packages?.length && !packageSelections[v.id] ? 'Choose a package' : 'Select ride'} <ArrowRight size={16} />
                     </button>
                   </div>
                 </div>
@@ -1006,6 +1022,16 @@ function BookingWizard({
 
       {step === 2 && quote && (
         <form onSubmit={book}>
+          {(() => {
+            const pkg = quote.packages?.find((item) => item.id === selectedPackageId);
+            return pkg ? <div className="package-booking-summary">
+              <strong>{pkg.name}: {pkg.includedHours} hours · {pkg.includedKm} km</strong>
+              <span>Package {money(pkg.estimatedFare ?? pkg.price)}{distance && distance > pkg.includedKm ? ` · ${distance - pkg.includedKm} extra km` : ''}</span>
+              <span>Extra km {money(pkg.extraKmRate)}/km · extra hour {money(pkg.extraHourRate)}/hour · tolls and parking extra</span>
+              <label>Additional hours requested (optional)<input type="number" min={0} max={48} value={extraHours} onChange={(e) => setExtraHours(Number(e.target.value))} /></label>
+              <strong>Estimated total: {money((pkg.estimatedFare ?? pkg.price) + extraHours * pkg.extraHourRate)}</strong>
+            </div> : null;
+          })()}
           <button type="button" className="text-button" onClick={() => setStep(1)}>
             <ChevronLeft size={16} /> Choose a different vehicle
           </button>
@@ -1043,7 +1069,7 @@ function BookingWizard({
               </h3>
               <p>{search.date} · {search.time}</p>
               {distance && <p>{distance} km by road {search.tripType === 'ROUND_TRIP' ? '· includes return journey' : ''}</p>}
-              <p>{directBooking ? `${quote.model} (${quote.number}) · ${quote.type}` : `${quote.type} (${quote.model})`} · {details.passengers} passenger(s)</p>
+              <p>{directBooking ? `${quote.model}${quote.number ? ` (${quote.number})` : ''} · ${quote.type}` : `${quote.type} (${quote.model})`} · {details.passengers} passenger(s)</p>
               <hr />
               <p className="notice">Instant reservation confirmation. Chauffeur and vehicle details will be dispatched prior to pickup.</p>
               <button className="primary full" disabled={busy}>

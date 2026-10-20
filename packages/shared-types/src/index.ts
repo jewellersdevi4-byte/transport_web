@@ -87,13 +87,26 @@ export interface VehicleDriverContact {
 export interface Vehicle {
   id: string;
   type: VehicleType;
-  number: string;
+  number?: string;
   model: string;
   capacity: number;
   ac: boolean;
   status: 'Available' | 'On Trip' | 'Maintenance' | 'Inactive';
   images?: string[];
+  packages?: VehiclePackage[];
   driver?: VehicleDriverContact;
+}
+
+export interface VehiclePackage {
+  id: string;
+  name: string;
+  includedHours: number;
+  includedKm: number;
+  price: number;
+  extraKmRate: number;
+  extraHourRate: number;
+  tollsParkingExtra: boolean;
+  estimatedFare?: number;
 }
 
 export interface Driver {
@@ -102,6 +115,9 @@ export interface Driver {
   phone: string;
   license: string;
   vehicleId: string;
+  packageId?: string;
+  packageName?: string;
+  extraHours?: number;
   status: 'Available' | 'On Trip' | 'Inactive';
   rating: number;
   trips: number;

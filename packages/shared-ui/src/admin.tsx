@@ -36,7 +36,7 @@ import {
   WifiOff,
   Camera,
 } from 'lucide-react';
-import type { Booking, Driver, Vehicle, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession } from '../../shared-types/src/index';
+import type { Booking, Driver, Vehicle, VehiclePackage, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession } from '../../shared-types/src/index';
 import { LocationInput } from './location-input';
 import { transitions } from '../../shared-utils/src/index';
 import {
@@ -1178,6 +1178,7 @@ function Fleet({ token }: { token: string }) {
     driverBaseLocation: string;
     driverBaseLocationPlaceId: string;
     driverServiceRadiusKm: number;
+    packages: VehiclePackage[];
   } | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1197,6 +1198,7 @@ function Fleet({ token }: { token: string }) {
     driverBaseLocation: '',
     driverBaseLocationPlaceId: '',
     driverServiceRadiusKm: 30,
+    packages: [] as VehiclePackage[],
   };
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1259,18 +1261,16 @@ function Fleet({ token }: { token: string }) {
     setBusy(true);
     setError('');
     try {
-      if (!edit.driverName.trim() || !/^osm:-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?:/.test(edit.driverBaseLocationPlaceId)) {
-        throw new Error('Choose the driver’s base location from the location suggestions before saving.');
-      }
       const coordinates = edit.driverBaseLocationPlaceId.match(/^osm:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?):/);
-      if (!coordinates) throw new Error('Select the driver’s base location from the suggestions.');
       await api(`/admin/vehicles${edit?.id ? `/${edit.id}` : ''}`, {
         method: edit?.id ? 'PUT' : 'POST',
         token,
         body: {
           ...edit,
-          driverBaseLatitude: Number(coordinates[1]),
-          driverBaseLongitude: Number(coordinates[2]),
+          driverBaseLocation: coordinates ? edit.driverBaseLocation : '',
+          driverBaseLocationPlaceId: coordinates ? edit.driverBaseLocationPlaceId : '',
+          driverBaseLatitude: coordinates ? Number(coordinates[1]) : undefined,
+          driverBaseLongitude: coordinates ? Number(coordinates[2]) : undefined,
         },
       });
       setEdit(null);
@@ -1405,7 +1405,7 @@ function Fleet({ token }: { token: string }) {
                     <Badge value={item.status} />
                   </div>
                   <h2>{item.model}</h2>
-                  <p><strong>{item.number}</strong></p>
+                  <p><strong>{item.number || 'Registration not added'}</strong></p>
                   <p className="muted">
                     {item.type} · {item.capacity} seats · {item.ac ? 'Climate Controlled AC' : 'Non-AC'}
                   </p>
@@ -1450,7 +1450,7 @@ function Fleet({ token }: { token: string }) {
                         setEdit({
                           id: item.id,
                           type: item.type,
-                          number: item.number,
+                          number: item.number || '',
                           model: item.model,
                           capacity: item.capacity,
                           ac: item.ac,
@@ -1462,6 +1462,7 @@ function Fleet({ token }: { token: string }) {
                           driverBaseLocation: item.driver?.baseLocation || '',
                           driverBaseLocationPlaceId: item.driver?.baseLocationPlaceId || '',
                           driverServiceRadiusKm: item.driver?.serviceRadiusKm || 30,
+                          packages: item.packages || [],
                         });
                         setError('');
                       }}
@@ -1491,12 +1492,12 @@ function Fleet({ token }: { token: string }) {
                 </select>
               </label>
               <label>
-                Vehicle Model
-                <input required placeholder="e.g. Toyota Innova Crysta" value={edit.model} onChange={(e) => setEdit({ ...edit, model: e.target.value })} />
+                Vehicle Name
+                <input required placeholder="e.g. Toyota Etios" value={edit.model} onChange={(e) => setEdit({ ...edit, model: e.target.value })} />
               </label>
               <label>
                 Registration Number
-                <input required placeholder="e.g. KA 01 AB 1234" value={edit.number} onChange={(e) => setEdit({ ...edit, number: e.target.value })} />
+                <input placeholder="Optional · e.g. KA 01 AB 1234" value={edit.number} onChange={(e) => setEdit({ ...edit, number: e.target.value })} />
               </label>
               <label>
                 Passenger Capacity (Seats)
@@ -1519,6 +1520,31 @@ function Fleet({ token }: { token: string }) {
                 </select>
               </label>
             </div>
+
+            <section className="card panel" style={{ marginTop: 18 }}>
+              <div className="section-title"><div><p className="eyebrow">OPTIONAL BOOKING PACKAGES</p><h3>Hourly and kilometre rates</h3></div><span className="muted">Tolls and parking can be charged separately</span></div>
+              <p className="muted">Add package prices. Customer quotes include package price and extra kilometres; requested extra hours are added during booking.</p>
+              <div className="actions" style={{ marginBottom: 12 }}>
+                <button type="button" className="secondary small" onClick={() => setEdit({ ...edit, packages: [...edit.packages, { id: crypto.randomUUID(), name: 'New package', includedHours: 1, includedKm: 50, price: 0, extraKmRate: 15, extraHourRate: 200, tollsParkingExtra: true }] })}>+ Add package</button>
+                <button type="button" className="secondary small" onClick={() => setEdit({ ...edit, packages: [...edit.packages, ...[
+                  { name: 'Full day', includedHours: 8, includedKm: 150, price: 3500 },
+                  { name: '5 hours', includedHours: 5, includedKm: 100, price: 2500 },
+                  { name: '3 hours', includedHours: 3, includedKm: 50, price: 1500 },
+                ].map((pkg) => ({ ...pkg, id: crypto.randomUUID(), extraKmRate: 15, extraHourRate: 200, tollsParkingExtra: true }))] })}>Add Etios sample rates</button>
+              </div>
+              {edit.packages.map((pkg, index) => <div key={pkg.id} className="card" style={{ padding: 12, marginBottom: 10 }}>
+                <div className="section-title"><strong>{pkg.name || `Package ${index + 1}`}</strong><button type="button" className="text-button" onClick={() => setEdit({ ...edit, packages: edit.packages.filter((_, n) => n !== index) })}>Remove</button></div>
+                <div className="form-grid">
+                  <label>Package name<input required value={pkg.name} onChange={(e) => setEdit({ ...edit, packages: edit.packages.map((item, n) => n === index ? { ...item, name: e.target.value } : item) })} /></label>
+                  <label>Included hours<input required type="number" min={1} max={48} value={pkg.includedHours} onChange={(e) => setEdit({ ...edit, packages: edit.packages.map((item, n) => n === index ? { ...item, includedHours: Number(e.target.value) } : item) })} /></label>
+                  <label>Included kilometres<input required type="number" min={1} value={pkg.includedKm} onChange={(e) => setEdit({ ...edit, packages: edit.packages.map((item, n) => n === index ? { ...item, includedKm: Number(e.target.value) } : item) })} /></label>
+                  <label>Package price (₹)<input required type="number" min={0} value={pkg.price} onChange={(e) => setEdit({ ...edit, packages: edit.packages.map((item, n) => n === index ? { ...item, price: Number(e.target.value) } : item) })} /></label>
+                  <label>Extra km rate (₹/km)<input required type="number" min={0} value={pkg.extraKmRate} onChange={(e) => setEdit({ ...edit, packages: edit.packages.map((item, n) => n === index ? { ...item, extraKmRate: Number(e.target.value) } : item) })} /></label>
+                  <label>Extra hour rate (₹/hour)<input required type="number" min={0} value={pkg.extraHourRate} onChange={(e) => setEdit({ ...edit, packages: edit.packages.map((item, n) => n === index ? { ...item, extraHourRate: Number(e.target.value) } : item) })} /></label>
+                  <label style={{ flexDirection: 'row', alignItems: 'center' }}><input type="checkbox" checked={pkg.tollsParkingExtra} onChange={(e) => setEdit({ ...edit, packages: edit.packages.map((item, n) => n === index ? { ...item, tollsParkingExtra: e.target.checked } : item) })} /> Tolls and parking extra</label>
+                </div>
+              </div>)}
+            </section>
 
             {/* VEHICLE PHOTOS GALLERY (UP TO 5 PHOTOS) */}
             <div style={{ marginTop: 18, marginBottom: 18, padding: '14px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
@@ -1599,11 +1625,11 @@ function Fleet({ token }: { token: string }) {
             <p className="eyebrow" style={{ marginTop: 18 }}>ASSIGNED CHAUFFEUR CONTACT</p>
             <div className="form-grid">
               <label>
-                Chauffeur Full Name
+                Driver Name
                 <input required placeholder="e.g. Ramesh Kumar" value={edit.driverName} onChange={(e) => setEdit({ ...edit, driverName: e.target.value })} />
               </label>
               <label>
-                Mobile / WhatsApp Number (10 digits)
+                Driver Phone Number (10 digits)
                 <input required placeholder="e.g. 9845012345" value={edit.driverPhone} onChange={(e) => setEdit({ ...edit, driverPhone: e.target.value })} />
               </label>
               <label>
@@ -1611,7 +1637,7 @@ function Fleet({ token }: { token: string }) {
                 <input placeholder="e.g. KA0120200012345" value={edit.driverLicense} onChange={(e) => setEdit({ ...edit, driverLicense: e.target.value })} />
               </label>
               <label style={{ gridColumn: '1 / -1' }}>
-                Driver base location (select a map suggestion)
+                Driver base location (optional, select a map suggestion)
                 <LocationInput
                   value={edit.driverBaseLocation}
                   placeId={edit.driverBaseLocationPlaceId}
@@ -1621,7 +1647,7 @@ function Fleet({ token }: { token: string }) {
               </label>
               <label>
                 Service radius (km)
-                <input type="number" min={1} max={250} required value={edit.driverServiceRadiusKm} onChange={(e) => setEdit({ ...edit, driverServiceRadiusKm: Number(e.target.value) })} />
+                <input type="number" min={1} max={250} value={edit.driverServiceRadiusKm} onChange={(e) => setEdit({ ...edit, driverServiceRadiusKm: Number(e.target.value) })} />
                 <small className="muted">Customers outside this radius will not see this vehicle.</small>
               </label>
             </div>
