@@ -21,6 +21,15 @@ const config: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: '/downloads/:path*',
+        destination: 'https://drive.usercontent.google.com/download?id=1MoQLR6XmFy_B9uAF1okhc87vrH8CqJat&export=download&confirm=t',
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default config;

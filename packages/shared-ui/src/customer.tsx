@@ -291,8 +291,16 @@ export default function CustomerApp() {
                 <p>Install the lightweight Android APK directly onto your phone for 1-tap bookings and offline driver contacts.</p>
               </div>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <button className="primary" onClick={() => navigate('download')}>
-                  <Download size={18} /> Download Android App ({config.data?.settings?.apkSize || '121 MB'}) <ArrowRight size={18} />
+                <a
+                  className="primary"
+                  href={getDirectDownloadUrl(config.data?.settings?.apkUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Download size={18} /> Download Android App ({config.data?.settings?.apkSize === '24.8 MB' ? '121 MB' : (config.data?.settings?.apkSize || '121 MB')})
+                </a>
+                <button className="secondary" onClick={() => navigate('download')}>
+                  Installation guide & QR code <ArrowRight size={16} />
                 </button>
               </div>
             </section>
@@ -1617,8 +1625,12 @@ function Profile({ token, logout }: { token: string; logout: () => void }) {
   );
 }
 
-function getDirectDownloadUrl(rawUrl: string): string {
-  if (!rawUrl) return '/downloads/customer-app-latest.apk';
+const GOOGLE_DRIVE_APK_URL = 'https://drive.usercontent.google.com/download?id=1MoQLR6XmFy_B9uAF1okhc87vrH8CqJat&export=download&confirm=t';
+
+function getDirectDownloadUrl(rawUrl?: string): string {
+  if (!rawUrl || rawUrl.startsWith('/downloads/')) {
+    return GOOGLE_DRIVE_APK_URL;
+  }
   const driveMatch = rawUrl.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/i);
   if (driveMatch) {
     return `https://drive.usercontent.google.com/download?id=${driveMatch[1]}&export=download&confirm=t`;
@@ -1633,10 +1645,9 @@ function DownloadPage({
   settings?: Settings;
   onHome: () => void;
 }) {
-  const rawApkUrl = settings?.apkUrl || 'https://drive.usercontent.google.com/download?id=1MoQLR6XmFy_B9uAF1okhc87vrH8CqJat&export=download&confirm=t';
-  const apkDownloadUrl = getDirectDownloadUrl(rawApkUrl);
+  const apkDownloadUrl = getDirectDownloadUrl(settings?.apkUrl);
   const apkVersion = settings?.apkVersion || '1.0.0';
-  const apkSize = settings?.apkSize || '121 MB';
+  const apkSize = settings?.apkSize === '24.8 MB' ? '121 MB' : (settings?.apkSize || '121 MB');
   const isExternalUrl = /^https?:\/\//i.test(apkDownloadUrl);
   const isPlayStore = /play\.google\.com/i.test(apkDownloadUrl);
   const downloadFileName = `dj-cabs-v${apkVersion}.apk`;
