@@ -105,10 +105,7 @@ export default function CustomerApp() {
             navigate('home');
           }}
         >
-          <span className="brand-icon">
-            <RouteIcon size={22} />
-          </span>
-          miles<span className="brand-light">&moments</span>
+          <img className="brand-logo" src="/brand/dj-cabs-logo.png" alt="DJ Cabs" />
         </a>
 
         <nav>
@@ -249,7 +246,7 @@ export default function CustomerApp() {
 
             <section className="benefits content-section">
               <div>
-                <p className="eyebrow">THE MILES & MOMENTS STANDARD</p>
+                <p className="eyebrow">THE DJ CABS STANDARD</p>
                 <h2>A superior journey,<br />from the first tap.</h2>
                 <p className="muted">Every vehicle and driver is strictly verified for safety and comfort.</p>
               </div>
@@ -373,9 +370,7 @@ export default function CustomerApp() {
       </main>
 
       <footer>
-        <div className="brand">
-          <RouteIcon /> miles&moments
-        </div>
+        <div className="brand"><img className="brand-logo footer-brand-logo" src="/brand/dj-cabs-logo.png" alt="DJ Cabs" /></div>
         <p>Premium cab booking & outstation journeys across Karnataka and South India.</p>
         <div>
           <button onClick={() => navigate('home')}>Book on web</button>
@@ -1200,7 +1195,7 @@ function TrackTripInline({ onOpenBooking }: { onOpenBooking: (id: string) => voi
                 <Check size={18} /> Trip completed <span aria-hidden="true">·</span> Safely dropped off
               </div>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#15803d' }}>
-                You have arrived at your destination. Thank you for traveling with Miles & Moments!
+                You have arrived at your destination. Thank you for traveling with DJ Cabs!
               </p>
             </div>
           )}
@@ -1382,7 +1377,7 @@ function CustomerDetail({
         <div className="actions">
           <a
             className="secondary"
-            href={`https://wa.me/?text=${encodeURIComponent(`Miles & Moments Journey #${b.bookingNumber}: ${b.pickup} → ${b.drop} on ${b.date} at ${b.time}. Vehicle: ${b.vehicleType}`)}`}
+            href={`https://wa.me/?text=${encodeURIComponent(`DJ Cabs Journey #${b.bookingNumber}: ${b.pickup} → ${b.drop} on ${b.date} at ${b.time}. Vehicle: ${b.vehicleType}`)}`}
             target="_blank"
             rel="noreferrer"
           >

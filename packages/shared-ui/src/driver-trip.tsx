@@ -258,9 +258,8 @@ export function DriverTripView() {
     <main style={{ maxWidth: 500, margin: '24px auto', padding: '0 16px 60px', fontFamily: 'system-ui, sans-serif' }}>
       {/* Top Header */}
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#0f766e', fontWeight: 700, fontSize: 16 }}>
-          <Car size={20} /> Miles & Moments Chauffeur Dispatch
-        </div>
+        <img src="/brand/dj-cabs-logo.png" alt="DJ Cabs" style={{ width: 220, maxWidth: '80%', height: 'auto', display: 'block', margin: '0 auto 8px' }} />
+        <div style={{ color: '#0f766e', fontWeight: 700, fontSize: 14 }}>Chauffeur Dispatch</div>
         <p style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>Trip Reference #{data.bookingNumber}</p>
       </div>
 

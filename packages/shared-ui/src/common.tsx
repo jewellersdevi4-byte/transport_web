@@ -44,7 +44,7 @@ export function Auth({admin=false,onLogin}:{admin?:boolean;onLogin:(token:string
     } catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   return <form className="auth-card card" onSubmit={submit}>
-    <div className="brand-icon"><Car/></div>
+    <img className="auth-brand-logo" src="/brand/dj-cabs-logo.png" alt="DJ Cabs" />
     <p className="eyebrow">{admin?'OPERATIONS, SIMPLIFIED':'YOUR NEXT JOURNEY STARTS HERE'}</p>
     <h1>{admin?'Welcome back, dispatch.':'Let’s get you moving.'}</h1>
     <p className="muted">{admin?'Sign in to manage your fleet and every journey.':'Sign in with a verification code sent to your email.'}</p>

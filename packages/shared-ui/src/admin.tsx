@@ -79,8 +79,9 @@ export default function AdminApp() {
     return (
       <div className="admin-login">
         <div className="login-story">
-          <div className="brand">
-            <RouteIcon /> miles&moments <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', fontWeight: 800 }}>DISPATCH CONSOLE</span>
+          <div className="brand login-brand">
+            <img className="brand-logo" src="/brand/dj-cabs-logo.png" alt="DJ Cabs" />
+            <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', fontWeight: 800 }}>DISPATCH CONSOLE</span>
           </div>
           <p className="eyebrow">CENTRAL OPERATIONS PORTAL</p>
           <h1>Real-time fleet.<br />Every mile in control.</h1>
@@ -97,8 +98,7 @@ export default function AdminApp() {
     <div className="admin-shell">
       <aside className={`sidebar ${menu ? 'open' : ''}`}>
         <a className="brand" href="/admin" onClick={(e) => { e.preventDefault(); setPage('Dashboard'); setBooking(''); }}>
-          <span className="brand-icon"><RouteIcon /></span>
-          <span>miles&moments<small>OPERATIONS HUB</small></span>
+          <img className="brand-logo sidebar-brand-logo" src="/brand/dj-cabs-logo.png" alt="DJ Cabs" />
         </a>
         <p className="nav-label">WORKSPACE</p>
         <nav>
@@ -725,7 +725,7 @@ function AdminBooking({ id, token, onBack }: { id: string; token: string; onBack
             const assignedDriver = drivers.data?.find((d) => d.id === b.driverId);
             const assignedVehicle = vehicles.data?.find((v) => v.id === b.vehicleId);
             const waText = encodeURIComponent(
-              `*Miles & Moments — New Trip Offer*\n\n` +
+              `*DJ Cabs — New Trip Offer*\n\n` +
               `*Booking ID:* #${b.bookingNumber}\n` +
               `*Pickup:* ${b.pickup}\n` +
               `*Drop:* ${b.drop}\n` +
@@ -1941,7 +1941,7 @@ function Notifications({ token }: { token: string }) {
     recipientId: 'all',
     channel: 'SMS',
     template: 'Booking confirmed',
-    message: 'Your booking has been confirmed with Miles & Moments. Chauffeur details will be sent shortly.',
+    message: 'Your booking has been confirmed with DJ Cabs. Chauffeur details will be sent shortly.',
   });
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -2003,7 +2003,7 @@ function Notifications({ token }: { token: string }) {
                   setForm({
                     ...form,
                     template: e.target.value,
-                    message: `Miles & Moments Update: ${e.target.value}. Please contact dispatch at +91 80 4712 3456 if you have any questions.`,
+                    message: `DJ Cabs Update: ${e.target.value}. Please contact dispatch at +91 80 4712 3456 if you have any questions.`,
                   })
                 }
               >
@@ -2209,7 +2209,7 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
   const [pairError, setPairError] = useState('');
   const [pairSuccess, setPairSuccess] = useState('');
   const [testPhone, setTestPhone] = useState('9845012345');
-  const [testMsg, setTestMsg] = useState('Hello from Miles & Moments! This is an automated WhatsApp dispatch test.');
+  const [testMsg, setTestMsg] = useState('Hello from DJ Cabs! This is an automated WhatsApp dispatch test.');
   const [sendingTest, setSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; id?: string; error?: string } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
