@@ -12,6 +12,7 @@ dist
 .env.*
 *.apk
 *.aab
+!apps/web/public/downloads/*.apk
 *.jks
 *.keystore
 *.p12
