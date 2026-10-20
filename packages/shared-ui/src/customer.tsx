@@ -62,7 +62,7 @@ type Search = {
 };
 
 type Quote = Vehicle & {
-  fare: number;
+  fare?: number;
   driverName?: string;
   driverRating?: number;
   driverTrips?: number;
@@ -417,6 +417,9 @@ function BookingWizard({
     returnDate: tomorrow,
     stops: [],
   });
+  const [searchMode, setSearchMode] = useState<'route' | 'pickup'>('route');
+  const [pickupOnlyResults, setPickupOnlyResults] = useState(false);
+  const [preferredVehicleId, setPreferredVehicleId] = useState('');
   const [step, setStep] = useState(0);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -453,14 +456,16 @@ function BookingWizard({
   const [distanceError, setDistanceError] = useState('');
   const [calculating, setCalculating] = useState(false);
   const routeReady = Boolean(
-    (search.pickupPlaceId || search.pickup.trim().length >= 3) &&
-    (search.dropPlaceId || search.drop.trim().length >= 3) &&
-    (search.tripType !== 'MULTI_CITY' || (search.stops.length > 0 && search.stops.every((s) => s.trim().length >= 3)))
+    (searchMode === 'pickup' ? search.pickupPlaceId : (search.pickupPlaceId || search.pickup.trim().length >= 3)) &&
+    (searchMode === 'pickup' || (
+      (search.dropPlaceId || search.drop.trim().length >= 3) &&
+      (search.tripType !== 'MULTI_CITY' || (search.stops.length > 0 && search.stops.every((s) => s.trim().length >= 3)))
+    ))
   );
   const routeRequest = JSON.stringify(search);
   useEffect(() => {
     setDistance(null); setDistanceError(''); setCalculating(false); setQuotes([]); setQuote(null);
-    if (!routeReady) return;
+    if (!routeReady || searchMode === 'pickup') return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setCalculating(true);
@@ -473,7 +478,7 @@ function BookingWizard({
         .finally(() => { if (!controller.signal.aborted) setCalculating(false); });
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [routeRequest, routeReady]);
+  }, [routeRequest, routeReady, searchMode]);
   const [key, setKey] = useState('');
 
   useEffect(() => {
@@ -501,10 +506,20 @@ function BookingWizard({
 
   async function find(e: React.FormEvent) {
     e.preventDefault();
-    if (!routeReady) { setError('Please enter or select pickup and destination locations.'); return; }
+    if (!routeReady) { setError(searchMode === 'pickup' ? 'Please select a pickup location from the suggestions.' : 'Please enter or select pickup and destination locations.'); return; }
     setBusy(true);
     setError('');
     try {
+      if (searchMode === 'pickup') {
+        const params = new URLSearchParams({ pickup: search.pickup, pickupPlaceId: search.pickupPlaceId || '', date: search.date, time: search.time });
+        const result = await api<{ vehicles: Quote[]; directVehicleBooking: boolean }>(`/customer/vehicles/by-pickup?${params.toString()}`);
+        setQuotes(result.vehicles);
+        setDirectBooking(result.directVehicleBooking);
+        setDistance(null);
+        setPickupOnlyResults(true);
+        setStep(1);
+        return;
+      }
       const pId = search.pickupPlaceId || 'place_pk_' + encodeURIComponent(search.pickup.trim().toLowerCase()).slice(0, 20);
       const dId = search.dropPlaceId || 'place_dp_' + encodeURIComponent(search.drop.trim().toLowerCase()).slice(0, 20);
       const params = new URLSearchParams({
@@ -524,6 +539,12 @@ function BookingWizard({
       }
       const r = await api<{ vehicles: Quote[]; estimated: boolean; distance: number; directVehicleBooking?: boolean }>(`/customer/vehicles/available?${params.toString()}`);
       setQuotes(r.vehicles);
+      setQuote(r.vehicles.find((vehicle) => vehicle.id === preferredVehicleId) || null);
+      if (preferredVehicleId && !r.vehicles.some((vehicle) => vehicle.id === preferredVehicleId)) {
+        setError('That car is not available for this full route and time. Please choose another car.');
+      }
+      setPreferredVehicleId('');
+      setPickupOnlyResults(false);
       setEstimated(r.estimated);
       setDistance(r.distance);
       if (typeof r.directVehicleBooking === 'boolean') {
@@ -675,7 +696,7 @@ function BookingWizard({
   return (
     <>
       <div className="section-title">
-        <h2>{['Where would you like to travel?', 'Select your preferred vehicle.', 'Enter passenger details.'][step]}</h2>
+        <h2>{step === 0 ? (searchMode === 'pickup' ? 'Find cars near your pickup.' : 'Where would you like to travel?') : step === 1 ? 'Select your preferred vehicle.' : 'Enter passenger details.'}</h2>
         <span className="muted">{step + 1} of 3 · Search → Fleet → Confirm</span>
       </div>
       {error && <ErrorBox message={error} />}
@@ -687,6 +708,16 @@ function BookingWizard({
 
       {step === 0 && (
         <form onSubmit={find}>
+          <div className="segmented search-mode-switch" aria-label="Vehicle search type">
+            <button type="button" className={searchMode === 'route' ? 'selected' : ''} onClick={() => { setSearchMode('route'); setPickupOnlyResults(false); setQuotes([]); }}>
+              Book a trip
+            </button>
+            <button type="button" className={searchMode === 'pickup' ? 'selected' : ''} onClick={() => { setSearchMode('pickup'); setPickupOnlyResults(false); setQuotes([]); }}>
+              Find cars by pickup
+            </button>
+          </div>
+          {searchMode === 'pickup' && <p className="muted pickup-search-hint">Choose a pickup point and time to see available cars and nearby chauffeurs. Add a destination later to book.</p>}
+          {searchMode === 'route' && <>
           <div className="segmented">
             {(['ONE_WAY', 'ROUND_TRIP', 'MULTI_CITY'] as const).map((t) => (
               <button
@@ -705,6 +736,7 @@ function BookingWizard({
               </button>
             ))}
           </div>
+          </>}
 
           <div className="search-grid">
             <label>
@@ -713,11 +745,11 @@ function BookingWizard({
                 onChange={(value, placeId) => setSearch({ ...search, pickup: value, pickupPlaceId: placeId })} />
             </label>
 
-            <label>
+            {searchMode === 'route' && <label>
               <span><MapPin size={15} /> Destination</span>
               <LocationInput value={search.drop} placeId={search.dropPlaceId} placeholder="Search destination address or paste Google Maps link"
                 onChange={(value, placeId) => setSearch({ ...search, drop: value, dropPlaceId: placeId })} />
-            </label>
+            </label>}
 
             <label>
               Departure date
@@ -740,7 +772,7 @@ function BookingWizard({
               />
             </label>
 
-            {search.tripType === 'ROUND_TRIP' && (
+            {searchMode === 'route' && search.tripType === 'ROUND_TRIP' && (
               <label>
                 Return date
                 <input
@@ -753,12 +785,12 @@ function BookingWizard({
               </label>
             )}
 
-            <button className="primary" disabled={busy || !routeReady || calculating}>
-              {busy ? 'Finding available rides…' : 'Find rides'} <ArrowRight size={18} />
+            <button className="primary" disabled={busy || !routeReady || (calculating && searchMode === 'route')}>
+              {busy ? 'Searching available cars…' : searchMode === 'pickup' ? 'Search cars at pickup' : 'Find rides'} <ArrowRight size={18} />
             </button>
           </div>
 
-          {search.tripType === 'MULTI_CITY' && (
+          {searchMode === 'route' && search.tripType === 'MULTI_CITY' && (
             <div className="multi-city-stops">
               <p className="eyebrow">INTERMEDIATE STOPS</p>
               {search.stops.map((stop, i) => (
@@ -791,10 +823,10 @@ function BookingWizard({
             </div>
           )}
 
-          <div className="route-distance" role="status">
+          {searchMode === 'route' && <div className="route-distance" role="status">
             {calculating ? 'Calculating driving distance…' : distanceError || (distance !== null ? `${distance} km by road${search.tripType === 'ROUND_TRIP' ? ' · includes return journey' : ''}` : 'Select locations from the suggestions to calculate driving distance.')}
             {distance !== null && <span className="google-attribution" translate="no">Google Maps</span>}
-          </div>
+          </div>}
           <div className="booking-footnote">
             <ShieldCheck size={14} /> Verified commercial chauffeurs • Sanitized air-conditioned fleet • 24/7 journey support
           </div>
@@ -803,13 +835,13 @@ function BookingWizard({
 
       {step === 1 && (
         <>
-          <p className="notice">{distance} km by road{search.tripType === 'ROUND_TRIP' ? ' · includes return journey' : ''}</p>
+          {pickupOnlyResults ? <p className="notice">Cars serving {search.pickup} on {search.date} at {search.time}. Fare is shown after you add a destination.</p> : <p className="notice">{distance} km by road{search.tripType === 'ROUND_TRIP' ? ' · includes return journey' : ''}</p>}
           <button className="text-button" onClick={() => setStep(0)}>
-            <ChevronLeft size={16} /> Edit trip route & time
+            <ChevronLeft size={16} /> {pickupOnlyResults ? 'Edit pickup & time' : 'Edit trip route & time'}
           </button>
-          <p className="muted">
+          {!pickupOnlyResults && <p className="muted">
             {search.pickup} {search.stops.length > 0 ? `via ${search.stops.filter(Boolean).join(' → ')} ` : ''}→ {search.drop} · {search.date} at {search.time}
-          </p>
+          </p>}
           <div className="grid-three">
             {quotes.map((v) => (
               <div
@@ -885,11 +917,20 @@ function BookingWizard({
                       className="primary small"
                       style={{ width: '100%', justifyContent: 'center' }}
                       onClick={() => {
-                        setQuote(v);
-                        setStep(2);
+                        if (pickupOnlyResults) {
+                          setPreferredVehicleId(v.id);
+                          setSearch((current) => ({ ...current, drop: '', dropPlaceId: '', tripType: 'ONE_WAY', stops: [], stopPlaceIds: [] }));
+                          setSearchMode('route');
+                          setPickupOnlyResults(false);
+                          setQuotes([]);
+                          setStep(0);
+                        } else {
+                          setQuote(v);
+                          setStep(2);
+                        }
                       }}
                     >
-                      Select ride <ArrowRight size={16} />
+                      {pickupOnlyResults ? 'Use this car' : 'Select ride'} <ArrowRight size={16} />
                     </button>
                   </div>
                 </div>

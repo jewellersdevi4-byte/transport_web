@@ -71,6 +71,7 @@
 .route-art>span{color:#1d5f59}
 .brand-logo{display:block;width:196px;height:auto;max-height:56px;object-fit:contain}
 .customer-header .brand{gap:0}
+.pickup-search-hint{margin:-8px 0 16px;font-size:12px}
 .footer-brand-logo{width:200px;max-height:none}
 .auth-brand-logo{display:block;width:230px;max-width:75%;height:auto;margin:0 auto 22px}
 .sidebar .brand{padding:0;width:max-content;max-width:100%}
