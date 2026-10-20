@@ -293,11 +293,10 @@ export default function CustomerApp() {
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <a
                   className="primary"
-                  href={getDirectDownloadUrl(config.data?.settings?.apkUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="/downloads/customer-app-latest.apk"
+                  download="dj-cabs-customer.apk"
                 >
-                  <Download size={18} /> Download Android App ({config.data?.settings?.apkSize === '24.8 MB' ? '121 MB' : (config.data?.settings?.apkSize || '121 MB')})
+                  <Download size={18} /> Download Android APK ({config.data?.settings?.apkSize === '24.8 MB' ? '121 MB' : (config.data?.settings?.apkSize || '121 MB')})
                 </a>
                 <button className="secondary" onClick={() => navigate('download')}>
                   Installation guide & QR code <ArrowRight size={16} />
@@ -1645,11 +1644,9 @@ function DownloadPage({
   settings?: Settings;
   onHome: () => void;
 }) {
-  const apkDownloadUrl = getDirectDownloadUrl(settings?.apkUrl);
+  const downloadUrl = '/downloads/customer-app-latest.apk';
   const apkVersion = settings?.apkVersion || '1.0.0';
   const apkSize = settings?.apkSize === '24.8 MB' ? '121 MB' : (settings?.apkSize || '121 MB');
-  const isExternalUrl = /^https?:\/\//i.test(apkDownloadUrl);
-  const isPlayStore = /play\.google\.com/i.test(apkDownloadUrl);
   const downloadFileName = `dj-cabs-v${apkVersion}.apk`;
 
   return (
@@ -1670,10 +1667,10 @@ function DownloadPage({
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', margin: '24px 0 16px' }}>
           <a
             className="primary"
-            href={apkDownloadUrl}
-            {...(isExternalUrl ? { target: '_blank', rel: 'noopener noreferrer' } : { download: downloadFileName })}
+            href={downloadUrl}
+            download={downloadFileName}
           >
-            <Download size={18} /> {isPlayStore ? 'Get on Google Play' : isExternalUrl ? 'Open Download Link' : `Download Official Android APK (${apkSize})`}
+            <Download size={18} /> Download Official Android APK ({apkSize})
           </a>
         </div>
 
@@ -1771,10 +1768,10 @@ function DownloadPage({
 
         <a
           className="primary full"
-          href={apkDownloadUrl}
-          {...(isExternalUrl ? { target: '_blank', rel: 'noopener noreferrer' } : { download: downloadFileName })}
+          href={downloadUrl}
+          download={downloadFileName}
         >
-          <Download size={18} /> {isPlayStore ? 'Get on Google Play' : isExternalUrl ? 'Download App' : `Download APK (${apkSize})`}
+          <Download size={18} /> Download APK ({apkSize})
         </a>
       </div>
     </div>
