@@ -69,13 +69,13 @@
 .premium-map-pin span{position:absolute;left:11px;top:8px;width:7px;height:7px;background:#fff;border-radius:50%;z-index:1}
 .route-art{background:linear-gradient(145deg,#f0f5f3,#e0ebe7)}
 .route-art>span{color:#1d5f59}
-.brand-logo{display:block;width:196px;height:auto;max-height:56px;object-fit:contain;background:#fff;border-radius:3px}
+.brand-logo{display:block;width:196px;height:auto;max-height:56px;object-fit:contain}
 .customer-header .brand{gap:0}
 .footer-brand-logo{width:200px;max-height:none}
 .auth-brand-logo{display:block;width:230px;max-width:75%;height:auto;margin:0 auto 22px}
-.sidebar .brand{padding:5px;background:#fff;border-radius:5px;width:max-content;max-width:100%}
+.sidebar .brand{padding:0;width:max-content;max-width:100%}
 .sidebar-brand-logo{width:174px;max-height:47px}
-.login-brand{width:max-content;max-width:100%;padding:4px;background:#fff;border-radius:4px}
+.login-brand{width:max-content;max-width:100%;padding:0}
 .login-brand .brand-logo{width:190px}
 @media(max-width:560px){.customer-header .brand-logo{width:156px;max-height:42px}.sidebar-brand-logo{width:156px}}
 @media(max-width:800px){.sidebar:not(.open) .brand{width:52px;height:48px;padding:3px;overflow:hidden}.sidebar:not(.open) .brand-logo{width:46px;max-height:42px}}
