@@ -292,7 +292,7 @@ export default function CustomerApp() {
               </div>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <button className="primary" onClick={() => navigate('download')}>
-                  <Download size={18} /> Download Android APK (24.8 MB) <ArrowRight size={18} />
+                  <Download size={18} /> Download Android App ({config.data?.settings?.apkSize || '24.8 MB'}) <ArrowRight size={18} />
                 </button>
               </div>
             </section>
@@ -1624,9 +1624,12 @@ function DownloadPage({
   settings?: Settings;
   onHome: () => void;
 }) {
-  const apkDownloadUrl = '/downloads/customer-app-latest.apk';
+  const apkDownloadUrl = settings?.apkUrl || '/downloads/customer-app-latest.apk';
   const apkVersion = settings?.apkVersion || '1.0.0';
   const apkSize = settings?.apkSize || '24.8 MB';
+  const isExternalUrl = /^https?:\/\//i.test(apkDownloadUrl);
+  const isPlayStore = /play\.google\.com/i.test(apkDownloadUrl);
+  const downloadFileName = `dj-cabs-v${apkVersion}.apk`;
 
   return (
     <div className="page download-page">
@@ -1644,8 +1647,12 @@ function DownloadPage({
         </p>
 
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', margin: '24px 0 16px' }}>
-          <a className="primary" href={apkDownloadUrl} download="miles-and-moments-v1.0.0.apk">
-            <Download size={18} /> Download Official Android APK ({apkSize})
+          <a
+            className="primary"
+            href={apkDownloadUrl}
+            {...(isExternalUrl ? { target: '_blank', rel: 'noopener noreferrer' } : { download: downloadFileName })}
+          >
+            <Download size={18} /> {isPlayStore ? 'Get on Google Play' : isExternalUrl ? 'Open Download Link' : `Download Official Android APK (${apkSize})`}
           </a>
         </div>
 
@@ -1656,7 +1663,7 @@ function DownloadPage({
           </div>
           <div className="apk-spec-item">
             <strong>Package Name</strong>
-            <span>com.milesandmoments.customer</span>
+            <span>com.djcabs.customer</span>
           </div>
           <div className="apk-spec-item">
             <strong>File Size</strong>
@@ -1741,8 +1748,12 @@ function DownloadPage({
           </div>
         </div>
 
-        <a className="primary full" href={apkDownloadUrl} download="miles-and-moments-v1.0.0.apk">
-          <Download size={18} /> Download APK (24.8 MB)
+        <a
+          className="primary full"
+          href={apkDownloadUrl}
+          {...(isExternalUrl ? { target: '_blank', rel: 'noopener noreferrer' } : { download: downloadFileName })}
+        >
+          <Download size={18} /> {isPlayStore ? 'Get on Google Play' : isExternalUrl ? 'Download App' : `Download APK (${apkSize})`}
         </a>
       </div>
     </div>
