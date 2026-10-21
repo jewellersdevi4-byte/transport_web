@@ -28,8 +28,9 @@ import {
   ExternalLink,
   CheckCircle2,
   Camera,
+  Star,
 } from 'lucide-react';
-import type { Booking, Customer, Route, Settings, Vehicle } from '../../shared-types/src/index';
+import type { Booking, Customer, Route, Settings, Vehicle, VehicleFeedbackSummary } from '../../shared-types/src/index';
 import {
   Auth,
   Badge,
@@ -497,6 +498,7 @@ function BookingWizard({
   const [otpCountdown, setOtpCountdown] = useState(0);
   const [otpHint, setOtpHint] = useState('');
   const [galleryModal, setGalleryModal] = useState<Quote | null>(null);
+  const [reviewsModalVehicle, setReviewsModalVehicle] = useState<Quote | null>(null);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   useEffect(() => {
@@ -955,6 +957,21 @@ function BookingWizard({
                   <p className="muted">
                     {directBooking ? `${v.type}${v.number ? ` · Reg: ${v.number}` : ''}` : `${v.model} or verified equivalent`}
                   </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0 10px' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
+                      <Star size={13} fill="#f59e0b" color="#f59e0b" /> {(v.rating ?? 5.0).toFixed(1)}
+                    </span>
+                    <button
+                      type="button"
+                      style={{ background: 'none', border: 'none', color: '#1d5f59', cursor: 'pointer', fontSize: '0.82rem', textDecoration: 'underline', padding: 0, fontWeight: 600 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReviewsModalVehicle(v);
+                      }}
+                    >
+                      {v.reviewCount ? `${v.reviewCount} verified ${v.reviewCount === 1 ? 'review' : 'reviews'}` : 'View reviews'}
+                    </button>
+                  </div>
                   <div className="vehicle-features">
                     <span><Users size={15} /> {v.capacity} passenger seats</span>
                     <span><Wind size={15} /> {v.ac ? 'Climate Controlled AC' : 'Non-AC'}</span>
@@ -1066,6 +1083,10 @@ function BookingWizard({
                 )}
               </div>
             </Modal>
+          )}
+
+          {reviewsModalVehicle && (
+            <VehicleReviewsModal vehicle={reviewsModalVehicle} onClose={() => setReviewsModalVehicle(null)} />
           )}
         </>
       )}
@@ -1448,6 +1469,215 @@ function MyBookings({ token, onOpen }: { token: string; onOpen: (id: string) => 
   );
 }
 
+function VehicleReviewsModal({ vehicle, onClose }: { vehicle: Quote; onClose: () => void }) {
+  const r = useResource<VehicleFeedbackSummary>(`/customer/vehicles/${vehicle.id}/feedback`);
+
+  return (
+    <Modal title={`${vehicle.model} — Reviews & Ratings`} onClose={onClose}>
+      {r.loading ? (
+        <Loading />
+      ) : r.error ? (
+        <ErrorBox message={r.error} retry={r.reload} />
+      ) : (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#f8fafc', padding: '16px 20px', borderRadius: 12, marginBottom: 18, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '2.4rem', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>
+              {(r.data?.averageRating ?? 5.0).toFixed(1)}
+            </div>
+            <div>
+              <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    size={20}
+                    fill={star <= Math.round(r.data?.averageRating ?? 5) ? '#f59e0b' : 'none'}
+                    color={star <= Math.round(r.data?.averageRating ?? 5) ? '#f59e0b' : '#cbd5e1'}
+                  />
+                ))}
+              </div>
+              <div style={{ fontSize: '0.86rem', color: '#64748b', marginTop: 4, fontWeight: 500 }}>
+                Based on {r.data?.reviewCount ?? 0} verified customer {r.data?.reviewCount === 1 ? 'review' : 'reviews'}
+              </div>
+            </div>
+          </div>
+
+          {!r.data?.reviews || r.data.reviews.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 16px', color: '#64748b' }}>
+              <p style={{ fontWeight: 600, fontSize: '1rem', color: '#0f172a', marginBottom: 4 }}>No reviews published yet</p>
+              <p style={{ fontSize: '0.88rem' }}>This vehicle maintains high quality standards. Customer feedback will appear here once approved by our moderation team.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12, maxHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
+              {r.data.reviews.map((rev) => (
+                <div
+                  key={rev.id}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 10,
+                    padding: 14,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <strong style={{ fontSize: '0.92rem', color: '#0f172a' }}>{rev.customerName}</strong>
+                      <span className="badge" style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.7rem', padding: '1px 6px' }}>Verified Rider</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          size={14}
+                          fill={star <= rev.rating ? '#f59e0b' : 'none'}
+                          color={star <= rev.rating ? '#f59e0b' : '#cbd5e1'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p style={{ margin: '4px 0 6px', fontSize: '0.9rem', color: '#334155', lineHeight: 1.5 }}>
+                    "{rev.message}"
+                  </p>
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                    {new Date(rev.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function CustomerFeedbackCard({ booking, token }: { booking: DetailBooking; token: string }) {
+  const [rating, setRating] = useState(5);
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim() || message.trim().length < 3) {
+      setError('Please provide feedback message of at least 3 characters.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await api('/customer/feedback', {
+        token,
+        method: 'POST',
+        body: {
+          vehicleId: booking.vehicleId,
+          bookingId: booking.id,
+          rating,
+          message: message.trim(),
+        },
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to submit feedback.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <section className="card detail-card" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', marginTop: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+            <Check size={22} />
+          </div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#15803d' }}>Thank you for your rating!</h3>
+            <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: '#166534' }}>
+              Your {rating}-star rating and feedback for <strong>{booking.vehicle?.model || booking.vehicleType}</strong> has been submitted. It will be displayed publicly after admin approval.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="card detail-card" style={{ marginTop: 14 }}>
+      <div className="section-title">
+        <div>
+          <h3 style={{ fontSize: '1.1rem', color: '#0f172a' }}>Rate Your Trip & Vehicle</h3>
+          <p className="muted" style={{ fontSize: '0.88rem', margin: '4px 0 0' }}>
+            Share your feedback about the {booking.vehicle?.model || booking.vehicleType} and chauffeur service.
+          </p>
+        </div>
+      </div>
+
+      {error && <ErrorBox message={error} />}
+
+      <form onSubmit={handleSubmit} style={{ marginTop: 12 }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+            Overall Rating
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 4,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+                onClick={() => setRating(star)}
+              >
+                <Star
+                  size={28}
+                  fill={star <= rating ? '#f59e0b' : 'none'}
+                  color={star <= rating ? '#f59e0b' : '#cbd5e1'}
+                />
+              </button>
+            ))}
+            <strong style={{ marginLeft: 8, color: '#b45309', fontSize: '0.98rem' }}>
+              {rating === 5 ? 'Excellent (5.0)' : rating === 4 ? 'Very Good (4.0)' : rating === 3 ? 'Good (3.0)' : rating === 2 ? 'Fair (2.0)' : 'Poor (1.0)'}
+            </strong>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: 'block', fontSize: '0.86rem', fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+            Your Feedback
+          </label>
+          <textarea
+            required
+            rows={3}
+            placeholder="Tell us about vehicle cleanliness, ride comfort, or chauffeur punctuality…"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            style={{
+              width: '100%',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
+              padding: '10px 12px',
+              fontSize: '0.92rem',
+              fontFamily: 'inherit',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        <button type="submit" disabled={busy} className="primary small" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Sparkles size={15} /> {busy ? 'Submitting…' : 'Submit Review for Approval'}
+        </button>
+      </form>
+    </section>
+  );
+}
+
 function CustomerDetail({
   id,
   token,
@@ -1513,6 +1743,10 @@ function CustomerDetail({
           )}
         </div>
       </section>
+
+      {b.status === 'COMPLETED' && (
+        <CustomerFeedbackCard booking={b} token={token} />
+      )}
       {confirm && (
         <Modal title="Cancel this reservation?" onClose={() => setConfirm(false)}>
           <p>

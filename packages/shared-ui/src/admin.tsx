@@ -35,8 +35,10 @@ import {
   Wifi,
   WifiOff,
   Camera,
+  Star,
 } from 'lucide-react';
-import type { Booking, Driver, Vehicle, VehiclePackage, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession } from '../../shared-types/src/index';
+import type { Booking, Driver, Vehicle, VehiclePackage, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession, VehicleFeedback } from '../../shared-types/src/index';
+import type { AdminFeedbackListResponse } from '../../api-contracts/src/index';
 import { LocationInput } from './location-input';
 import { transitions } from '../../shared-utils/src/index';
 import {
@@ -60,6 +62,7 @@ const navigation = [
   ['Dashboard', LayoutDashboard],
   ['Bookings', CalendarDays],
   ['Fleet', Car],
+  ['Reviews', Star],
   ['Pricing', Tag],
   ['Reports', ChartNoAxesCombined],
   ['WhatsApp', MessageSquare],
@@ -73,6 +76,8 @@ export default function AdminApp() {
   const [booking, setBooking] = useState('');
   const [menu, setMenu] = useState(false);
   const [version, setVersion] = useState(0);
+  const pendingFeedback = useResource<AdminFeedbackListResponse>('/admin/feedback?status=PENDING', session.token);
+  const pendingCount = pendingFeedback.data?.pendingCount || 0;
 
   if (!session.ready) return <Loading />;
   if (!session.token) {
@@ -115,6 +120,11 @@ export default function AdminApp() {
               <Icon size={18} />
               {name}
               {name === 'Bookings' && <span className="nav-dot" />}
+              {name === 'Reviews' && pendingCount > 0 && (
+                <span className="badge" style={{ marginLeft: 'auto', background: '#f59e0b', color: '#fff', fontSize: '0.72rem', padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>
+                  {pendingCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -171,6 +181,8 @@ export default function AdminApp() {
             <Bookings token={session.token} open={setBooking} />
           ) : page === 'Fleet' || page === 'Drivers' || page === 'Vehicles' ? (
             <Fleet token={session.token} />
+          ) : page === 'Reviews' ? (
+            <ReviewsPage token={session.token} onStatusChange={() => pendingFeedback.reload()} />
           ) : page === 'Pricing' ? (
             <PricingPage token={session.token} />
           ) : page === 'Reports' ? (
@@ -1658,6 +1670,253 @@ function Fleet({ token }: { token: string }) {
           </form>
         </Modal>
       )}
+    </>
+  );
+}
+
+function ReviewsPage({ token, onStatusChange }: { token: string; onStatusChange?: () => void }) {
+  const [statusFilter, setStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING');
+  const [vehicleFilter, setVehicleFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
+
+  const r = useResource<AdminFeedbackListResponse>(
+    `/admin/feedback?status=${statusFilter}${vehicleFilter ? `&vehicleId=${encodeURIComponent(vehicleFilter)}` : ''}`,
+    token
+  );
+  const vehicles = useResource<Vehicle[]>('/admin/vehicles', token);
+
+  const handleUpdateStatus = async (id: string, newStatus: 'APPROVED' | 'REJECTED') => {
+    setUpdatingId(id);
+    setActionError('');
+    try {
+      await api(`/admin/feedback/${id}/status`, {
+        token,
+        method: 'PATCH',
+        body: { status: newStatus },
+      });
+      r.reload();
+      onStatusChange?.();
+    } catch (err) {
+      setActionError((err as Error).message || 'Failed to update review status');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const feedbacks = (r.data?.feedbacks || []).filter((f) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      f.customerName?.toLowerCase().includes(q) ||
+      f.vehicleModel?.toLowerCase().includes(q) ||
+      f.message?.toLowerCase().includes(q) ||
+      (f.bookingId && f.bookingId.toLowerCase().includes(q))
+    );
+  });
+
+  const pendingCount = r.data?.pendingCount || 0;
+
+  return (
+    <>
+      <Heading
+        title="Vehicle Reviews & Moderation"
+        description="Review customer ratings and feedback. Only approved feedback is displayed publicly on booking cards and vehicle profiles."
+        action={
+          <button className="secondary" onClick={() => { r.reload(); onStatusChange?.(); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <RefreshCw size={15} /> Refresh
+          </button>
+        }
+      />
+
+      {actionError && <ErrorBox message={actionError} />}
+
+      <section className="card panel">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          {(
+            [
+              ['PENDING', `Pending Approval (${pendingCount})`],
+              ['APPROVED', 'Approved (Public)'],
+              ['REJECTED', 'Rejected'],
+              ['ALL', 'All Reviews'],
+            ] as const
+          ).map(([val, title]) => (
+            <button
+              key={val}
+              type="button"
+              className={statusFilter === val ? 'primary small' : 'secondary small'}
+              style={{
+                borderRadius: 20,
+                fontWeight: statusFilter === val ? 700 : 500,
+              }}
+              onClick={() => setStatusFilter(val)}
+            >
+              {title}
+            </button>
+          ))}
+        </div>
+
+        <div className="filters">
+          <label className="search-field" style={{ flex: 1, minWidth: 260 }}>
+            <Search size={16} />
+            <input
+              placeholder="Search by customer, vehicle, or comments…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+
+          <select
+            aria-label="Filter by vehicle"
+            value={vehicleFilter}
+            onChange={(e) => setVehicleFilter(e.target.value)}
+            style={{ minWidth: 200 }}
+          >
+            <option value="">All Vehicles</option>
+            {vehicles.data?.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.model} {v.number ? `(${v.number})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {r.loading && !r.data ? (
+          <Loading />
+        ) : r.error ? (
+          <ErrorBox message={r.error} retry={r.reload} />
+        ) : feedbacks.length === 0 ? (
+          <Empty title={`No ${statusFilter === 'ALL' ? '' : statusFilter.toLowerCase()} reviews found`}>
+            <p>
+              {statusFilter === 'PENDING'
+                ? 'All customer feedback has been reviewed! New feedback submissions will appear here.'
+                : 'No feedback matching the selected filters.'}
+            </p>
+          </Empty>
+        ) : (
+          <div style={{ display: 'grid', gap: 16, marginTop: 12 }}>
+            {feedbacks.map((f) => {
+              const matchedVehicle = vehicles.data?.find((v) => v.id === f.vehicleId);
+              const isUpdating = updatingId === f.id;
+
+              return (
+                <div
+                  key={f.id}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12,
+                    padding: 18,
+                    background: '#ffffff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+                          🚗 {matchedVehicle?.model || f.vehicleModel || 'Vehicle'}
+                        </span>
+                        {matchedVehicle?.number && (
+                          <span className="badge" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.78rem' }}>
+                            {matchedVehicle.number}
+                          </span>
+                        )}
+                        <span
+                          className="badge"
+                          style={{
+                            background: f.status === 'APPROVED' ? '#dcfce7' : f.status === 'REJECTED' ? '#fee2e2' : '#fef3c7',
+                            color: f.status === 'APPROVED' ? '#15803d' : f.status === 'REJECTED' ? '#b91c1c' : '#92400e',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                          }}
+                        >
+                          {f.status === 'APPROVED' ? 'Approved & Public' : f.status === 'REJECTED' ? 'Rejected' : 'Pending Review'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: '0.86rem', color: '#64748b' }}>
+                        <span>By <strong>{f.customerName}</strong>{f.customerEmail ? ` (${f.customerEmail})` : ''}</span>
+                        {f.bookingId && (
+                          <>
+                            <span>·</span>
+                            <span>Trip: #{f.bookingId}</span>
+                          </>
+                        )}
+                        <span>·</span>
+                        <span>{new Date(f.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fffbeb', padding: '6px 12px', borderRadius: 10, border: '1px solid #fef3c7' }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          size={18}
+                          fill={star <= f.rating ? '#f59e0b' : 'none'}
+                          color={star <= f.rating ? '#f59e0b' : '#cbd5e1'}
+                        />
+                      ))}
+                      <strong style={{ marginLeft: 6, color: '#b45309', fontSize: '0.92rem' }}>{f.rating}.0 / 5</strong>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      borderRadius: 8,
+                      padding: '12px 16px',
+                      fontSize: '0.95rem',
+                      lineHeight: 1.5,
+                      color: '#1e293b',
+                      borderLeft: '4px solid #f59e0b',
+                      fontStyle: 'italic',
+                      marginBottom: 14,
+                    }}
+                  >
+                    "{f.message}"
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, paddingTop: 6, borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      {f.moderatedAt && (
+                        <span>
+                          Moderated by {f.moderatedBy || 'Admin'} on {new Date(f.moderatedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {f.status !== 'APPROVED' && (
+                        <button
+                          type="button"
+                          className="primary small"
+                          disabled={isUpdating}
+                          style={{ background: '#10b981', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                          onClick={() => handleUpdateStatus(f.id, 'APPROVED')}
+                        >
+                          <Check size={15} /> {isUpdating ? 'Approving…' : 'Approve & Publish'}
+                        </button>
+                      )}
+
+                      {f.status !== 'REJECTED' && (
+                        <button
+                          type="button"
+                          className="danger-button small"
+                          disabled={isUpdating}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                          onClick={() => handleUpdateStatus(f.id, 'REJECTED')}
+                        >
+                          <X size={15} /> {isUpdating ? 'Rejecting…' : f.status === 'APPROVED' ? 'Reject / Revoke' : 'Reject'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </>
   );
 }

@@ -95,6 +95,33 @@ export interface Vehicle {
   images?: string[];
   packages?: VehiclePackage[];
   driver?: VehicleDriverContact;
+  rating?: number;
+  reviewCount?: number;
+}
+
+export type FeedbackStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface VehicleFeedback {
+  id: string;
+  vehicleId: string;
+  vehicleModel?: string;
+  bookingId?: string;
+  customerId: string;
+  customerName: string;
+  customerEmail?: string;
+  rating: number; // 1 to 5
+  message: string;
+  status: FeedbackStatus;
+  createdAt: string;
+  moderatedAt?: string;
+  moderatedBy?: string;
+}
+
+export interface VehicleFeedbackSummary {
+  vehicleId: string;
+  averageRating: number;
+  reviewCount: number;
+  reviews: VehicleFeedback[];
 }
 
 export interface VehiclePackage {
@@ -115,9 +142,6 @@ export interface Driver {
   phone: string;
   license: string;
   vehicleId: string;
-  packageId?: string;
-  packageName?: string;
-  extraHours?: number;
   status: 'Available' | 'On Trip' | 'Inactive';
   rating: number;
   trips: number;
@@ -190,6 +214,9 @@ export interface Booking {
   requests: string;
   vehicleType: VehicleType;
   vehicleId: string;
+  packageId?: string;
+  packageName?: string;
+  extraHours?: number;
   driverId: string | null;
   assignment: AssignmentStatus;
   assignmentExpiresAt?: string;
@@ -322,6 +349,7 @@ export interface Store {
   notifications: Notice[];
   payments: Payment[];
   settings: Settings;
+  feedbacks?: VehicleFeedback[];
   adminUsers?: AdminUser[];
   emailOtps?: EmailOtpRecord[];
   whatsappSession?: WhatsAppSession;

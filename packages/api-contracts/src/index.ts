@@ -10,6 +10,10 @@ import type {
   InvoiceData,
   BookingStatus,
   VehicleType,
+  VehiclePackage,
+  VehicleFeedback,
+  VehicleFeedbackSummary,
+  FeedbackStatus,
 } from '../../shared-types/src/index';
 
 export const API_PREFIX = '/api/v1';
@@ -32,6 +36,9 @@ export const ENDPOINTS = {
     CANCEL_BOOKING: (id: string) => `${API_PREFIX}/customer/bookings/${id}/cancel`,
     INVOICE: (id: string) => `${API_PREFIX}/customer/bookings/${id}/invoice`,
     AVAILABLE_VEHICLES: `${API_PREFIX}/customer/vehicles/available`,
+    VEHICLES_BY_PICKUP: `${API_PREFIX}/customer/vehicles/by-pickup`,
+    FEEDBACK: `${API_PREFIX}/customer/feedback`,
+    VEHICLE_FEEDBACK: (vehicleId: string) => `${API_PREFIX}/customer/vehicles/${vehicleId}/feedback`,
   },
   ADMIN: {
     DASHBOARD: `${API_PREFIX}/admin/dashboard`,
@@ -45,6 +52,8 @@ export const ENDPOINTS = {
     DRIVER_BY_ID: (id: string) => `${API_PREFIX}/admin/drivers/${id}`,
     VEHICLES: `${API_PREFIX}/admin/vehicles`,
     VEHICLE_BY_ID: (id: string) => `${API_PREFIX}/admin/vehicles/${id}`,
+    FEEDBACKS: `${API_PREFIX}/admin/feedback`,
+    FEEDBACK_STATUS: (id: string) => `${API_PREFIX}/admin/feedback/${id}/status`,
     PRICING: `${API_PREFIX}/admin/pricing`,
     ROUTES: `${API_PREFIX}/admin/routes`,
     ROUTE_BY_ID: (id: string) => `${API_PREFIX}/admin/routes/${id}`,
@@ -67,6 +76,7 @@ export const ENDPOINTS = {
 
 export interface QuoteItem extends Vehicle {
   fare: number;
+  packages?: VehiclePackage[];
   driverName?: string;
   driverRating?: number;
   driverTrips?: number;
@@ -77,6 +87,11 @@ export interface AvailableVehiclesResponse {
   distance: number;
   estimated: boolean;
   vehicles: QuoteItem[];
+}
+
+export interface PickupAvailabilityResponse {
+  directVehicleBooking: boolean;
+  vehicles: Array<Omit<QuoteItem, 'fare'>>;
 }
 
 export interface CustomerAuthResponse {
@@ -114,3 +129,20 @@ export interface ConfigResponse {
   routes: Route[];
   mockMode: boolean;
 }
+
+export interface CreateFeedbackInput {
+  vehicleId: string;
+  bookingId?: string;
+  rating: number;
+  message: string;
+}
+
+export interface UpdateFeedbackStatusInput {
+  status: FeedbackStatus;
+}
+
+export interface AdminFeedbackListResponse {
+  feedbacks: VehicleFeedback[];
+  pendingCount: number;
+}
+
