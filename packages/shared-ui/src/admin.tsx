@@ -1933,6 +1933,222 @@ function ReviewsPage({ token, onStatusChange }: { token: string; onStatusChange?
   );
 }
 
+interface RouteFormState extends Route {
+  originPlaceId?: string;
+  destinationPlaceId?: string;
+}
+
+function RouteEditModal({
+  route,
+  token,
+  onClose,
+  onSaved,
+}: {
+  route: Route;
+  token: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState<RouteFormState>({ ...route });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [calculatingDist, setCalculatingDist] = useState(false);
+  const [distInfo, setDistInfo] = useState<string | null>(null);
+
+  const calculateDistance = async (orig: string, dest: string, origPlaceId?: string, destPlaceId?: string) => {
+    if (!orig?.trim() || !dest?.trim() || orig.trim().length < 3 || dest.trim().length < 3) return;
+    setCalculatingDist(true);
+    setDistInfo(null);
+    try {
+      const res = await api<{ distance: number }>('/maps/distance', {
+        method: 'POST',
+        body: {
+          pickup: orig.trim(),
+          drop: dest.trim(),
+          pickupPlaceId: origPlaceId || 'place_pk_' + encodeURIComponent(orig.trim().toLowerCase()).slice(0, 20),
+          dropPlaceId: destPlaceId || 'place_dp_' + encodeURIComponent(dest.trim().toLowerCase()).slice(0, 20),
+          tripType: 'ONE_WAY',
+          stops: [],
+        },
+      });
+      if (res && typeof res.distance === 'number' && res.distance > 0) {
+        const rounded = Math.round(res.distance);
+        setForm((prev) => {
+          const shouldUpdatePrice = !prev.id || prev.fixedPrice === 1500 || prev.fixedPrice === 0;
+          return {
+            ...prev,
+            distance: rounded,
+            fixedPrice: shouldUpdatePrice ? Math.max(500, Math.round(rounded * 15)) : prev.fixedPrice,
+          };
+        });
+        setDistInfo(`✓ Calculated route distance: ${rounded} km by road`);
+      }
+    } catch (err) {
+      console.warn('Distance calculation error:', err);
+    } finally {
+      setCalculatingDist(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.origin.trim() || !form.destination.trim()) {
+      setError('Please provide both Origin and Destination locations.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const payload: Route = {
+        id: form.id,
+        origin: form.origin.trim(),
+        destination: form.destination.trim(),
+        distance: Number(form.distance),
+        fixedPrice: Number(form.fixedPrice),
+        active: Boolean(form.active),
+      };
+      await api(`/admin/routes${form.id ? `/${form.id}` : ''}`, {
+        token,
+        method: form.id ? 'PUT' : 'POST',
+        body: payload,
+      });
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to save route configuration');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const effectiveRate = form.distance > 0 ? (form.fixedPrice / form.distance).toFixed(1) : '0';
+
+  return (
+    <Modal
+      title={form.id ? `Edit Route: ${form.origin || 'Origin'} → ${form.destination || 'Destination'}` : 'Add New Familiar Route'}
+      onClose={onClose}
+    >
+      <form onSubmit={handleSave}>
+        <p className="muted" style={{ fontSize: '0.88rem', marginBottom: 14 }}>
+          Configure familiar outstation routes for customers with guaranteed fixed pricing. Start typing to see map and address suggestions.
+        </p>
+
+        <div style={{ marginBottom: 16 }}>
+          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
+            Origin Location (Pickup City, Airport, or Landmark)
+          </span>
+          <LocationInput
+            value={form.origin}
+            placeId={form.originPlaceId}
+            placeholder="Search pickup city, airport or landmark (e.g. Bengaluru Airport)"
+            onChange={(origin, originPlaceId) => {
+              setForm((prev) => ({ ...prev, origin, originPlaceId }));
+              if (form.destination && form.destination.trim().length >= 3) {
+                calculateDistance(origin, form.destination, originPlaceId, form.destinationPlaceId);
+              }
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
+            Destination Location (Drop City, Attraction, or Town)
+          </span>
+          <LocationInput
+            value={form.destination}
+            placeId={form.destinationPlaceId}
+            placeholder="Search destination city or landmark (e.g. Mysuru Palace, Coorg, Ooty)"
+            onChange={(destination, destinationPlaceId) => {
+              setForm((prev) => ({ ...prev, destination, destinationPlaceId }));
+              if (form.origin && form.origin.trim().length >= 3) {
+                calculateDistance(form.origin, destination, form.originPlaceId, destinationPlaceId);
+              }
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+          {distInfo ? (
+            <span style={{ fontSize: '0.84rem', color: '#15803d', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <Check size={14} /> {distInfo}
+            </span>
+          ) : (
+            <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+              💡 Pick locations from suggestions or map to auto-calculate driving distance.
+            </span>
+          )}
+          <button
+            type="button"
+            className="secondary"
+            style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+            disabled={calculatingDist || !form.origin?.trim() || !form.destination?.trim()}
+            onClick={() => calculateDistance(form.origin, form.destination, form.originPlaceId, form.destinationPlaceId)}
+          >
+            {calculatingDist ? 'Calculating road distance…' : '⚡ Calculate Distance'}
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <label>
+            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
+              One-Way Distance (km)
+            </span>
+            <input
+              required
+              type="number"
+              min={1}
+              max={5000}
+              value={form.distance}
+              onChange={(e) => setForm({ ...form, distance: Number(e.target.value) })}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </label>
+
+          <label>
+            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
+              Fixed All-Inclusive Fare (₹)
+            </span>
+            <input
+              required
+              type="number"
+              min={1}
+              max={500000}
+              value={form.fixedPrice}
+              onChange={(e) => setForm({ ...form, fixedPrice: Number(e.target.value) })}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </label>
+        </div>
+
+        <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 14, border: '1px solid #e2e8f0', fontSize: '0.86rem', color: '#475569' }}>
+          💡 <strong>Effective Rate:</strong> ₹{effectiveRate} / km (for a Sedan on this pairing)
+        </div>
+
+        <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <input
+            type="checkbox"
+            checked={form.active}
+            onChange={(e) => setForm({ ...form, active: e.target.checked })}
+          />
+          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>
+            Active Route (Display under "Familiar routes" on customer homepage)
+          </span>
+        </label>
+
+        {error && <ErrorBox message={error} />}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button type="button" className="secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={busy}>
+            {busy ? 'Saving Route…' : form.id ? 'Save Changes' : 'Create Route'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function RoutesPage({ token }: { token: string }) {
   const routes = useResource<Route[]>('/admin/routes', token);
   const [search, setSearch] = useState('');
@@ -1942,26 +2158,6 @@ function RoutesPage({ token }: { token: string }) {
   const [busy, setBusy] = useState(false);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!edit) return;
-    setBusy(true);
-    setError('');
-    try {
-      await api(`/admin/routes${edit.id ? `/${edit.id}` : ''}`, {
-        token,
-        method: edit.id ? 'PUT' : 'POST',
-        body: edit,
-      });
-      setEdit(null);
-      routes.reload();
-    } catch (err) {
-      setError((err as Error).message || 'Failed to save route configuration');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const handleToggleActive = async (route: Route) => {
     setToggleBusyId(route.id);
@@ -2194,104 +2390,17 @@ function RoutesPage({ token }: { token: string }) {
         )}
       </section>
 
-      {/* Edit / Create Route Modal */}
+      {/* Edit / Create Route Modal with Location Suggestions */}
       {edit && (
-        <Modal
-          title={edit.id ? `Edit Route: ${edit.origin || 'Origin'} → ${edit.destination || 'Destination'}` : 'Add New Familiar Route'}
+        <RouteEditModal
+          route={edit}
+          token={token}
           onClose={() => setEdit(null)}
-        >
-          <form onSubmit={handleSave}>
-            <p className="muted" style={{ fontSize: '0.88rem', marginBottom: 14 }}>
-              Configure familiar outstation routes for customers with guaranteed fixed pricing.
-            </p>
-
-            <label style={{ display: 'block', marginBottom: 12 }}>
-              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
-                Origin Location (e.g. Bengaluru Airport, Indiranagar, City Center)
-              </span>
-              <input
-                required
-                type="text"
-                placeholder="e.g. Bengaluru Airport"
-                value={edit.origin}
-                onChange={(e) => setEdit({ ...edit, origin: e.target.value })}
-                style={{ width: '100%', boxSizing: 'border-box' }}
-              />
-            </label>
-
-            <label style={{ display: 'block', marginBottom: 12 }}>
-              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
-                Destination Location (e.g. Mysuru Palace, Coorg, Ooty, Chikmagalur)
-              </span>
-              <input
-                required
-                type="text"
-                placeholder="e.g. Mysuru Palace"
-                value={edit.destination}
-                onChange={(e) => setEdit({ ...edit, destination: e.target.value })}
-                style={{ width: '100%', boxSizing: 'border-box' }}
-              />
-            </label>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <label>
-                <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
-                  One-Way Distance (km)
-                </span>
-                <input
-                  required
-                  type="number"
-                  min={1}
-                  max={5000}
-                  value={edit.distance}
-                  onChange={(e) => setEdit({ ...edit, distance: Number(e.target.value) })}
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
-              </label>
-
-              <label>
-                <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
-                  Fixed All-Inclusive Fare (₹)
-                </span>
-                <input
-                  required
-                  type="number"
-                  min={1}
-                  max={500000}
-                  value={edit.fixedPrice}
-                  onChange={(e) => setEdit({ ...edit, fixedPrice: Number(e.target.value) })}
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
-              </label>
-            </div>
-
-            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 14, border: '1px solid #e2e8f0', fontSize: '0.86rem', color: '#475569' }}>
-              💡 <strong>Effective Rate:</strong> ₹{(edit.fixedPrice / Math.max(1, edit.distance)).toFixed(1)} / km (for a Sedan on this pairing)
-            </div>
-
-            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <input
-                type="checkbox"
-                checked={edit.active}
-                onChange={(e) => setEdit({ ...edit, active: e.target.checked })}
-              />
-              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>
-                Active Route (Display under "Familiar routes" on customer homepage)
-              </span>
-            </label>
-
-            {error && <ErrorBox message={error} />}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <button type="button" className="secondary" onClick={() => setEdit(null)}>
-                Cancel
-              </button>
-              <button type="submit" className="primary" disabled={busy}>
-                {busy ? 'Saving Route…' : edit.id ? 'Save Changes' : 'Create Route'}
-              </button>
-            </div>
-          </form>
-        </Modal>
+          onSaved={() => {
+            setEdit(null);
+            routes.reload();
+          }}
+        />
       )}
 
       {/* Delete Confirmation Modal */}
@@ -2419,50 +2528,15 @@ function PricingPage({ token }: { token: string }) {
       </section>
 
       {edit && (
-        <Modal title={edit.id ? 'Edit Fixed Route' : 'Create Fixed Route'} onClose={() => setEdit(null)}>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setBusy(true);
-              try {
-                await api(`/admin/routes${edit.id ? `/${edit.id}` : ''}`, {
-                  token,
-                  method: edit.id ? 'PUT' : 'POST',
-                  body: edit,
-                });
-                setEdit(null);
-                routes.reload();
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {(['origin', 'destination', 'distance', 'fixedPrice'] as const).map((f) => (
-              <label key={f}>
-                {label(f)}
-                <input
-                  required
-                  type={f === 'distance' || f === 'fixedPrice' ? 'number' : 'text'}
-                  min={1}
-                  value={edit[f]}
-                  onChange={(e) =>
-                    setEdit({ ...edit, [f]: f === 'distance' || f === 'fixedPrice' ? Number(e.target.value) : e.target.value })
-                  }
-                />
-              </label>
-            ))}
-            <label className="checkbox-label" style={{ margin: '14px 0' }}>
-              <input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} />
-              <span style={{ marginLeft: 8 }}>Active Route (Visible in Customer search)</span>
-            </label>
-            {error && <ErrorBox message={error} />}
-            <button className="primary" disabled={busy}>
-              Save Route Configuration
-            </button>
-          </form>
-        </Modal>
+        <RouteEditModal
+          route={edit}
+          token={token}
+          onClose={() => setEdit(null)}
+          onSaved={() => {
+            setEdit(null);
+            routes.reload();
+          }}
+        />
       )}
     </>
   );
