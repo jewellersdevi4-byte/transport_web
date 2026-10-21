@@ -177,3 +177,181 @@
   .stats-grid{grid-template-columns:1fr;}
   .header-right .avatar{display:none;}
 }
+
+/* Mobile App Download First Experience */
+.mobile-smart-banner {
+  display: none;
+}
+
+.mobile-hero-app-card {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-smart-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #0e2a61;
+    color: #ffffff;
+    gap: 12px;
+    position: relative;
+    z-index: 50;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+
+  .mobile-smart-banner-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .mobile-smart-banner-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
+  }
+
+  .mobile-smart-banner-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .mobile-smart-banner-text strong {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-smart-banner-text span {
+    font-size: 10.5px;
+    color: #cbd5e1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-smart-banner-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #1d5f59;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  .mobile-smart-banner-cta:active {
+    background: #144440;
+    transform: scale(0.98);
+  }
+
+  /* Mobile Hero App Card: The very first prominent element in Hero on mobile */
+  .mobile-hero-app-card {
+    display: block;
+    background: #ffffff;
+    border: 1.5px solid #c7dcd5;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 22px;
+    box-shadow: 0 10px 25px -5px rgba(16, 36, 58, 0.1), 0 4px 10px -2px rgba(16, 36, 58, 0.05);
+  }
+
+  .mobile-hero-app-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #edf6f3;
+    color: #1d5f59;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 4px 9px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    border: 1px solid #d3e7e0;
+  }
+
+  .mobile-hero-app-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .mobile-hero-app-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+    border: 1px solid #e2e8f0;
+  }
+
+  .mobile-hero-app-title-group {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-hero-app-title-group h3 {
+    margin: 0 0 3px 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: #10243a;
+  }
+
+  .mobile-hero-app-title-group p {
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: #64748b;
+  }
+
+  .mobile-hero-download-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #1d5f59 !important;
+    color: #ffffff !important;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 13px 16px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(29, 95, 89, 0.25);
+  }
+
+  .mobile-hero-download-btn:active {
+    background: #144440 !important;
+  }
+
+  .mobile-hero-app-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 12px;
+    margin-top: 10px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #1d5f59;
+  }
+}
+

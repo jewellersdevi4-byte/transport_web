@@ -96,6 +96,24 @@ export default function CustomerApp() {
 
   return (
     <>
+      {/* Mobile Top Smart Banner: Direct APK Download First */}
+      <div className="mobile-smart-banner">
+        <div className="mobile-smart-banner-info">
+          <img src="/brand/icon.png" alt="DJ Cabs" className="mobile-smart-banner-icon" />
+          <div className="mobile-smart-banner-text">
+            <strong>DJ Cabs Mobile App</strong>
+            <span>Instant booking & live tracking</span>
+          </div>
+        </div>
+        <a
+          href="/downloads/customer-app-latest.apk"
+          download="dj-cabs-v1.0.2.apk"
+          className="mobile-smart-banner-cta"
+        >
+          <Download size={14} /> Download APK
+        </a>
+      </div>
+
       <header className="customer-header">
         <a
           className="brand"
@@ -145,6 +163,31 @@ export default function CustomerApp() {
           <>
             <section className="hero">
               <div className="hero-copy">
+                {/* Mobile Hero App Card: The very first visual card mobile users see */}
+                <div className="mobile-hero-app-card">
+                  <div className="mobile-hero-app-badge">
+                    <ShieldCheck size={13} /> OFFICIAL ANDROID APP • v1.0.2
+                  </div>
+                  <div className="mobile-hero-app-content">
+                    <img src="/brand/icon.png" alt="DJ Cabs" className="mobile-hero-app-icon" />
+                    <div className="mobile-hero-app-title-group">
+                      <h3>Get the DJ Cabs App</h3>
+                      <p>Instant cab booking, live driver status & WhatsApp confirmations on your phone.</p>
+                    </div>
+                  </div>
+                  <a
+                    href="/downloads/customer-app-latest.apk"
+                    download="dj-cabs-v1.0.2.apk"
+                    className="primary full mobile-hero-download-btn"
+                  >
+                    <Download size={17} /> Download Android App (APK • 63 MB)
+                  </a>
+                  <div className="mobile-hero-app-meta">
+                    <span>✓ 100% Free & Verified</span>
+                    <span>✓ Fast 1-Tap Download</span>
+                  </div>
+                </div>
+
                 <div className="prod-hero-badge">
                   <span className="green-dot" /> PREMIUM CHAUFFEUR & OUTSTATION SERVICE
                 </div>
