@@ -139,6 +139,28 @@ export default function AdminApp() {
             <strong>Bengaluru Dispatch Hub</strong>
             <small>Fleet & Operations Center</small>
           </div>
+          <a
+            href="/downloads/admin-app-latest.apk"
+            download="dj-cabs-admin-latest.apk"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              margin: '8px 0',
+              borderRadius: 8,
+              background: '#f8fafc',
+              color: '#334155',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              textDecoration: 'none',
+              border: '1px solid #e2e8f0',
+              transition: 'background 0.2s'
+            }}
+          >
+            <Smartphone size={16} color="#2563eb" />
+            <span>Download Admin App</span>
+          </a>
           <button onClick={session.logout}>
             <LogOut size={16} /> Sign out
           </button>
