@@ -277,11 +277,37 @@ export default function CustomerApp() {
                     </div>
                     <div className="route-body">
                       <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
-                      <p>{r.distance} km · Private chauffeur service</p>
-                      <div className="section-title">
-                        <span><strong>{r.distance} km approx.</strong></span>
-                        <ArrowUpRight size={20} />
-                      </div>
+                      {(() => {
+                        const ratePerKm = Math.round(r.fixedPrice / Math.max(1, r.distance));
+                        return (
+                          <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 10px', flexWrap: 'wrap' }}>
+                              <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
+                                ₹{ratePerKm} / km
+                              </span>
+                              <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                                {r.distance} km by road
+                              </span>
+                            </div>
+                            <div className="section-title" style={{ marginTop: 'auto', paddingTop: 6, alignItems: 'flex-end' }}>
+                              <div>
+                                <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                                  Fixed All-Inclusive Fare
+                                </div>
+                                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                                  {money(r.fixedPrice)}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600 }}>
+                                  ({r.distance} km × ₹{ratePerKm}/km)
+                                </div>
+                              </div>
+                              <span style={{ background: '#f1f5f9', padding: '7px', borderRadius: 8, display: 'inline-flex', color: '#1d5f59' }}>
+                                <ArrowUpRight size={18} />
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </button>
                 ))}
@@ -370,20 +396,44 @@ export default function CustomerApp() {
                   </div>
                   <div className="route-body">
                     <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
-                    <p>{r.distance} km approx. · Private Sedan / SUV</p>
-                    <div className="section-title" style={{ marginTop: 14 }}>
-                      <span><strong>{r.distance} km approx.</strong></span>
-                      <button
-                        className="primary small"
-                        onClick={() => {
-                          window.dispatchEvent(new CustomEvent('choose-route', { detail: r }));
-                          setActiveTab('book');
-                          navigate('home');
-                        }}
-                      >
-                        Book this route
-                      </button>
-                    </div>
+                    {(() => {
+                      const ratePerKm = Math.round(r.fixedPrice / Math.max(1, r.distance));
+                      return (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 10px', flexWrap: 'wrap' }}>
+                            <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
+                              ₹{ratePerKm} / km
+                            </span>
+                            <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                              {r.distance} km by road
+                            </span>
+                          </div>
+                          <div className="section-title" style={{ marginTop: 'auto', paddingTop: 6, alignItems: 'flex-end' }}>
+                            <div>
+                              <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                                All-Inclusive Fixed Fare
+                              </div>
+                              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                                {money(r.fixedPrice)}
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600 }}>
+                                ({r.distance} km × ₹{ratePerKm}/km)
+                              </div>
+                            </div>
+                            <button
+                              className="primary small"
+                              onClick={() => {
+                                window.dispatchEvent(new CustomEvent('choose-route', { detail: r }));
+                                setActiveTab('book');
+                                navigate('home');
+                              }}
+                            >
+                              Book for {money(r.fixedPrice)}
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -893,6 +943,37 @@ function BookingWizard({
       {step === 1 && (
         <>
           {pickupOnlyResults ? <p className="notice">Cars serving {search.pickup} on {search.date} at {search.time}. Fare is shown after you add a destination.</p> : <p className="notice">{distance} km by road{search.tripType === 'ROUND_TRIP' ? ' · includes return journey' : ''}</p>}
+          {(() => {
+            const pNorm = (search.pickup || '').trim().toLowerCase();
+            const dNorm = (search.drop || '').trim().toLowerCase();
+            const matchedRoute = (routes || []).find(
+              (r) => r.active &&
+                (r.origin.toLowerCase() === pNorm || pNorm.includes(r.origin.toLowerCase())) &&
+                (r.destination.toLowerCase() === dNorm || dNorm.includes(r.destination.toLowerCase()))
+            );
+            if (!matchedRoute) return null;
+            const ratePerKm = Math.round(matchedRoute.fixedPrice / Math.max(1, matchedRoute.distance));
+            return (
+              <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 16px', margin: '10px 0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#166534', fontWeight: 700, fontSize: '0.92rem' }}>
+                    <Star size={16} fill="#16a34a" color="#16a34a" /> Popular Familiar Route: {matchedRoute.origin} → {matchedRoute.destination}
+                  </div>
+                  <div style={{ fontSize: '0.84rem', color: '#15803d', marginTop: 3 }}>
+                    Calculated at <strong>₹{ratePerKm}/km</strong> for {matchedRoute.distance} km = <strong>{money(matchedRoute.fixedPrice)}</strong> all-inclusive fixed fare for Sedan.
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#166534' }}>
+                    {money(matchedRoute.fixedPrice)}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 600 }}>
+                    ({matchedRoute.distance} km × ₹{ratePerKm}/km)
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           <button className="text-button" onClick={() => setStep(0)}>
             <ChevronLeft size={16} /> {pickupOnlyResults ? 'Edit pickup & time' : 'Edit trip route & time'}
           </button>
@@ -1140,6 +1221,22 @@ function BookingWizard({
               </h3>
               <p>{search.date} · {search.time}</p>
               {distance && <p>{distance} km by road {search.tripType === 'ROUND_TRIP' ? '· includes return journey' : ''}</p>}
+              {(() => {
+                const pNorm = (search.pickup || '').trim().toLowerCase();
+                const dNorm = (search.drop || '').trim().toLowerCase();
+                const matchedRoute = (routes || []).find(
+                  (r) => r.active &&
+                    (r.origin.toLowerCase() === pNorm || pNorm.includes(r.origin.toLowerCase())) &&
+                    (r.destination.toLowerCase() === dNorm || dNorm.includes(r.destination.toLowerCase()))
+                );
+                if (!matchedRoute) return null;
+                const ratePerKm = Math.round(matchedRoute.fixedPrice / Math.max(1, matchedRoute.distance));
+                return (
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 12px', margin: '8px 0', fontSize: '0.84rem', color: '#166534' }}>
+                    ✓ <strong>Familiar Route Rate:</strong> {matchedRoute.distance} km × ₹{ratePerKm}/km = <strong>{money(matchedRoute.fixedPrice)}</strong>
+                  </div>
+                );
+              })()}
               <p>{directBooking ? `${quote.model}${quote.number ? ` (${quote.number})` : ''} · ${quote.type}` : `${quote.type} (${quote.model})`} · {details.passengers} passenger(s)</p>
               <hr />
               <p className="notice">Instant reservation confirmation. Chauffeur and vehicle details will be dispatched prior to pickup.</p>

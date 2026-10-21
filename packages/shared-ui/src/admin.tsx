@@ -1955,6 +1955,37 @@ function RouteEditModal({
   const [calculatingDist, setCalculatingDist] = useState(false);
   const [distInfo, setDistInfo] = useState<string | null>(null);
 
+  // Initialize per-km price based on existing route or default 15
+  const initialPerKm = route.distance > 0 && route.fixedPrice > 0
+    ? Math.round((route.fixedPrice / route.distance) * 10) / 10
+    : 15;
+  const [perKmPrice, setPerKmPrice] = useState<number>(initialPerKm);
+
+  // Sync total when perKmPrice changes
+  const handlePerKmChange = (rate: number) => {
+    setPerKmPrice(rate);
+    const validDist = Number(form.distance) || 0;
+    const newTotal = Math.max(0, Math.round(validDist * rate));
+    setForm((prev) => ({ ...prev, fixedPrice: newTotal }));
+  };
+
+  // Sync total when distance changes
+  const handleDistanceChange = (dist: number) => {
+    const validDist = Math.max(0, dist);
+    const validRate = Number(perKmPrice) || 0;
+    const newTotal = Math.max(0, Math.round(validDist * validRate));
+    setForm((prev) => ({ ...prev, distance: validDist, fixedPrice: newTotal }));
+  };
+
+  // If admin adjusts fixedPrice directly, update perKmPrice
+  const handleFixedPriceChange = (price: number) => {
+    const validPrice = Math.max(0, price);
+    setForm((prev) => ({ ...prev, fixedPrice: validPrice }));
+    if (form.distance > 0) {
+      setPerKmPrice(Math.round((validPrice / form.distance) * 10) / 10);
+    }
+  };
+
   const calculateDistance = async (orig: string, dest: string, origPlaceId?: string, destPlaceId?: string) => {
     if (!orig?.trim() || !dest?.trim() || orig.trim().length < 3 || dest.trim().length < 3) return;
     setCalculatingDist(true);
@@ -1973,15 +2004,14 @@ function RouteEditModal({
       });
       if (res && typeof res.distance === 'number' && res.distance > 0) {
         const rounded = Math.round(res.distance);
-        setForm((prev) => {
-          const shouldUpdatePrice = !prev.id || prev.fixedPrice === 1500 || prev.fixedPrice === 0;
-          return {
-            ...prev,
-            distance: rounded,
-            fixedPrice: shouldUpdatePrice ? Math.max(500, Math.round(rounded * 15)) : prev.fixedPrice,
-          };
-        });
-        setDistInfo(`✓ Calculated route distance: ${rounded} km by road`);
+        const validRate = Number(perKmPrice) || 15;
+        const calculatedFare = Math.round(rounded * validRate);
+        setForm((prev) => ({
+          ...prev,
+          distance: rounded,
+          fixedPrice: calculatedFare,
+        }));
+        setDistInfo(`✓ Road distance detected: ${rounded} km (${rounded} km × ₹${validRate}/km = ₹${calculatedFare})`);
       }
     } catch (err) {
       console.warn('Distance calculation error:', err);
@@ -2020,8 +2050,6 @@ function RouteEditModal({
     }
   };
 
-  const effectiveRate = form.distance > 0 ? (form.fixedPrice / form.distance).toFixed(1) : '0';
-
   return (
     <Modal
       title={form.id ? `Edit Route: ${form.origin || 'Origin'} → ${form.destination || 'Destination'}` : 'Add New Familiar Route'}
@@ -2029,7 +2057,7 @@ function RouteEditModal({
     >
       <form onSubmit={handleSave}>
         <p className="muted" style={{ fontSize: '0.88rem', marginBottom: 14 }}>
-          Configure familiar outstation routes for customers with guaranteed fixed pricing. Start typing to see map and address suggestions.
+          Configure familiar outstation routes for customers. Set the distance and price per km to automatically calculate the total fixed fare displayed to users.
         </p>
 
         <div style={{ marginBottom: 16 }}>
@@ -2073,7 +2101,7 @@ function RouteEditModal({
             </span>
           ) : (
             <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-              💡 Pick locations from suggestions or map to auto-calculate driving distance.
+              💡 Pick locations from suggestions or map to auto-detect road distance.
             </span>
           )}
           <button
@@ -2087,7 +2115,7 @@ function RouteEditModal({
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 12, marginBottom: 12 }}>
           <label>
             <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
               One-Way Distance (km)
@@ -2097,30 +2125,57 @@ function RouteEditModal({
               type="number"
               min={1}
               max={5000}
-              value={form.distance}
-              onChange={(e) => setForm({ ...form, distance: Number(e.target.value) })}
+              value={form.distance || ''}
+              onChange={(e) => handleDistanceChange(Number(e.target.value))}
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
           </label>
 
           <label>
+            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#166534', display: 'block', marginBottom: 6 }}>
+              Price Per KM (₹/km)
+            </span>
+            <input
+              required
+              type="number"
+              step="0.5"
+              min={1}
+              max={500}
+              placeholder="e.g. 15"
+              value={perKmPrice || ''}
+              onChange={(e) => handlePerKmChange(Number(e.target.value))}
+              style={{ width: '100%', boxSizing: 'border-box', borderColor: '#86efac', background: '#f0fdf4', fontWeight: 700 }}
+            />
+          </label>
+
+          <label>
             <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
-              Fixed All-Inclusive Fare (₹)
+              Calculated Fare (₹)
             </span>
             <input
               required
               type="number"
               min={1}
               max={500000}
-              value={form.fixedPrice}
-              onChange={(e) => setForm({ ...form, fixedPrice: Number(e.target.value) })}
-              style={{ width: '100%', boxSizing: 'border-box' }}
+              value={form.fixedPrice || ''}
+              onChange={(e) => handleFixedPriceChange(Number(e.target.value))}
+              style={{ width: '100%', boxSizing: 'border-box', fontWeight: 700 }}
             />
           </label>
         </div>
 
-        <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 14, border: '1px solid #e2e8f0', fontSize: '0.86rem', color: '#475569' }}>
-          💡 <strong>Effective Rate:</strong> ₹{effectiveRate} / km (for a Sedan on this pairing)
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: 12, borderRadius: 8, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+            <span style={{ fontSize: '0.88rem', color: '#166534', fontWeight: 600 }}>
+              💰 Customer Fare Formula:
+            </span>
+            <span style={{ fontSize: '1.05rem', color: '#15803d', fontWeight: 800 }}>
+              {form.distance} km × ₹{perKmPrice}/km = ₹{form.fixedPrice}
+            </span>
+          </div>
+          <small style={{ color: '#15803d', display: 'block', marginTop: 4 }}>
+            Customers on the website will see this exact breakdown ({form.distance} km @ ₹{perKmPrice}/km).
+          </small>
         </div>
 
         <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
@@ -2340,11 +2395,14 @@ function RoutesPage({ token }: { token: string }) {
                         <MapPin size={14} color="#1d5f59" /> <strong>{route.distance} km</strong>
                       </span>
                       <span>·</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <IndianRupee size={14} color="#059669" /> Fixed Fare: <strong style={{ color: '#059669', fontSize: '0.98rem' }}>{money(route.fixedPrice)}</strong>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: '0.82rem' }}>
+                        ₹{(route.fixedPrice / Math.max(1, route.distance)).toFixed(0)} / km
                       </span>
                       <span>·</span>
-                      <span>Rate: ~₹{(route.fixedPrice / Math.max(1, route.distance)).toFixed(1)}/km</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <IndianRupee size={14} color="#059669" /> Calculated Fare: <strong style={{ color: '#059669', fontSize: '1.02rem' }}>{money(route.fixedPrice)}</strong>
+                      </span>
+                      <span style={{ color: '#15803d', fontSize: '0.8rem', fontWeight: 600 }}>({route.distance} km × ₹{(route.fixedPrice / Math.max(1, route.distance)).toFixed(0)}/km)</span>
                     </div>
                   </div>
 
