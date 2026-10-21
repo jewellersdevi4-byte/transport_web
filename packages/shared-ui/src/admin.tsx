@@ -36,6 +36,8 @@ import {
   WifiOff,
   Camera,
   Star,
+  MapPin,
+  Trash2,
 } from 'lucide-react';
 import type { Booking, Driver, Vehicle, VehiclePackage, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession, VehicleFeedback } from '../../shared-types/src/index';
 import type { AdminFeedbackListResponse } from '../../api-contracts/src/index';
@@ -62,6 +64,7 @@ const navigation = [
   ['Dashboard', LayoutDashboard],
   ['Bookings', CalendarDays],
   ['Fleet', Car],
+  ['Routes', RouteIcon],
   ['Reviews', Star],
   ['Pricing', Tag],
   ['Reports', ChartNoAxesCombined],
@@ -181,6 +184,8 @@ export default function AdminApp() {
             <Bookings token={session.token} open={setBooking} />
           ) : page === 'Fleet' || page === 'Drivers' || page === 'Vehicles' ? (
             <Fleet token={session.token} />
+          ) : page === 'Routes' ? (
+            <RoutesPage token={session.token} />
           ) : page === 'Reviews' ? (
             <ReviewsPage token={session.token} onStatusChange={() => pendingFeedback.reload()} />
           ) : page === 'Pricing' ? (
@@ -1924,6 +1929,391 @@ function ReviewsPage({ token, onStatusChange }: { token: string; onStatusChange?
           </div>
         )}
       </section>
+    </>
+  );
+}
+
+function RoutesPage({ token }: { token: string }) {
+  const routes = useResource<Route[]>('/admin/routes', token);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [edit, setEdit] = useState<Route | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!edit) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/admin/routes${edit.id ? `/${edit.id}` : ''}`, {
+        token,
+        method: edit.id ? 'PUT' : 'POST',
+        body: edit,
+      });
+      setEdit(null);
+      routes.reload();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to save route configuration');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleActive = async (route: Route) => {
+    setToggleBusyId(route.id);
+    try {
+      await api(`/admin/routes/${route.id}`, {
+        token,
+        method: 'PUT',
+        body: {
+          ...route,
+          active: !route.active,
+        },
+      });
+      routes.reload();
+    } catch (err) {
+      alert((err as Error).message || 'Failed to toggle route status');
+    } finally {
+      setToggleBusyId(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setBusy(true);
+    try {
+      await api(`/admin/routes/${id}`, {
+        token,
+        method: 'DELETE',
+      });
+      setDeleteId(null);
+      routes.reload();
+    } catch (err) {
+      alert((err as Error).message || 'Failed to delete route');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const allRoutes = routes.data || [];
+  const activeCount = allRoutes.filter((r) => r.active).length;
+  const inactiveCount = allRoutes.length - activeCount;
+
+  const filtered = allRoutes.filter((r) => {
+    if (statusFilter === 'ACTIVE' && !r.active) return false;
+    if (statusFilter === 'INACTIVE' && r.active) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      r.origin.toLowerCase().includes(q) ||
+      r.destination.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <>
+      <Heading
+        title="Familiar & Outstation Routes"
+        description="Add, edit, or disable popular routes displayed to customers under 'Familiar routes' on the homepage. Configure fixed fares, distances, and live visibility."
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={() =>
+                setEdit({
+                  id: '',
+                  origin: '',
+                  destination: '',
+                  distance: 50,
+                  fixedPrice: 1500,
+                  active: true,
+                })
+              }
+            >
+              <Plus size={16} /> Add Familiar Route
+            </button>
+            <button
+              className="secondary"
+              onClick={() => routes.reload()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </div>
+        }
+      />
+
+      {error && <ErrorBox message={error} />}
+
+      {/* Metrics Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
+        <div className="card" style={{ padding: '14px 18px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Configured Routes</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', marginTop: 4 }}>{allRoutes.length}</div>
+        </div>
+        <div className="card" style={{ padding: '14px 18px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>Active on Customer Web</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#15803d', marginTop: 4 }}>{activeCount} Live</div>
+        </div>
+        <div className="card" style={{ padding: '14px 18px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#991b1b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Inactive / Hidden</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#b91c1c', marginTop: 4 }}>{inactiveCount} Hidden</div>
+        </div>
+      </div>
+
+      <section className="card panel">
+        <div className="filters" style={{ marginBottom: 16 }}>
+          <label className="search-field" style={{ flex: 1, minWidth: 260 }}>
+            <Search size={16} />
+            <input
+              placeholder="Search by origin city or destination (e.g. Mysuru, Airport)…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+            style={{ minWidth: 180 }}
+          >
+            <option value="ALL">All Routes ({allRoutes.length})</option>
+            <option value="ACTIVE">Active Only ({activeCount})</option>
+            <option value="INACTIVE">Inactive Only ({inactiveCount})</option>
+          </select>
+        </div>
+
+        {routes.loading && !routes.data ? (
+          <Loading />
+        ) : routes.error ? (
+          <ErrorBox message={routes.error} retry={routes.reload} />
+        ) : filtered.length === 0 ? (
+          <Empty title="No routes found">
+            <p>
+              {allRoutes.length === 0
+                ? 'No fixed outstation routes have been added yet. Click "+ Add Familiar Route" above to create one.'
+                : 'No routes match your search filters.'}
+            </p>
+          </Empty>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {filtered.map((route) => {
+              const isToggling = toggleBusyId === route.id;
+              return (
+                <div
+                  key={route.id}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12,
+                    padding: 18,
+                    background: '#ffffff',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 14,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 280 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                      <h3 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 800, color: '#0f172a' }}>
+                        {route.origin} <ArrowRight size={17} style={{ verticalAlign: 'middle', margin: '0 4px', color: '#1d5f59' }} /> {route.destination}
+                      </h3>
+                      <span
+                        className="badge"
+                        style={{
+                          background: route.active ? '#dcfce7' : '#fee2e2',
+                          color: route.active ? '#15803d' : '#b91c1c',
+                          fontWeight: 700,
+                          fontSize: '0.78rem',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                        }}
+                      >
+                        {route.active ? '● Active on Website' : '○ Inactive (Hidden)'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: '0.88rem', color: '#64748b' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <MapPin size={14} color="#1d5f59" /> <strong>{route.distance} km</strong>
+                      </span>
+                      <span>·</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <IndianRupee size={14} color="#059669" /> Fixed Fare: <strong style={{ color: '#059669', fontSize: '0.98rem' }}>{money(route.fixedPrice)}</strong>
+                      </span>
+                      <span>·</span>
+                      <span>Rate: ~₹{(route.fixedPrice / Math.max(1, route.distance)).toFixed(1)}/km</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      disabled={isToggling}
+                      style={{
+                        color: route.active ? '#b91c1c' : '#15803d',
+                        borderColor: route.active ? '#fca5a5' : '#86efac',
+                        background: route.active ? '#fff5f5' : '#f0fdf4',
+                        fontWeight: 600,
+                      }}
+                      onClick={() => handleToggleActive(route)}
+                    >
+                      {isToggling ? 'Updating…' : route.active ? 'Hide from Web' : 'Make Active'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="primary small"
+                      onClick={() => {
+                        setError('');
+                        setEdit(route);
+                      }}
+                    >
+                      Edit Route
+                    </button>
+
+                    <button
+                      type="button"
+                      className="danger-button small"
+                      onClick={() => setDeleteId(route.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Edit / Create Route Modal */}
+      {edit && (
+        <Modal
+          title={edit.id ? `Edit Route: ${edit.origin || 'Origin'} → ${edit.destination || 'Destination'}` : 'Add New Familiar Route'}
+          onClose={() => setEdit(null)}
+        >
+          <form onSubmit={handleSave}>
+            <p className="muted" style={{ fontSize: '0.88rem', marginBottom: 14 }}>
+              Configure familiar outstation routes for customers with guaranteed fixed pricing.
+            </p>
+
+            <label style={{ display: 'block', marginBottom: 12 }}>
+              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
+                Origin Location (e.g. Bengaluru Airport, Indiranagar, City Center)
+              </span>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Bengaluru Airport"
+                value={edit.origin}
+                onChange={(e) => setEdit({ ...edit, origin: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </label>
+
+            <label style={{ display: 'block', marginBottom: 12 }}>
+              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
+                Destination Location (e.g. Mysuru Palace, Coorg, Ooty, Chikmagalur)
+              </span>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Mysuru Palace"
+                value={edit.destination}
+                onChange={(e) => setEdit({ ...edit, destination: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <label>
+                <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
+                  One-Way Distance (km)
+                </span>
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  max={5000}
+                  value={edit.distance}
+                  onChange={(e) => setEdit({ ...edit, distance: Number(e.target.value) })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </label>
+
+              <label>
+                <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#334155', display: 'block', marginBottom: 6 }}>
+                  Fixed All-Inclusive Fare (₹)
+                </span>
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  max={500000}
+                  value={edit.fixedPrice}
+                  onChange={(e) => setEdit({ ...edit, fixedPrice: Number(e.target.value) })}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </label>
+            </div>
+
+            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 14, border: '1px solid #e2e8f0', fontSize: '0.86rem', color: '#475569' }}>
+              💡 <strong>Effective Rate:</strong> ₹{(edit.fixedPrice / Math.max(1, edit.distance)).toFixed(1)} / km (for a Sedan on this pairing)
+            </div>
+
+            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <input
+                type="checkbox"
+                checked={edit.active}
+                onChange={(e) => setEdit({ ...edit, active: e.target.checked })}
+              />
+              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>
+                Active Route (Display under "Familiar routes" on customer homepage)
+              </span>
+            </label>
+
+            {error && <ErrorBox message={error} />}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button type="button" className="secondary" onClick={() => setEdit(null)}>
+                Cancel
+              </button>
+              <button type="submit" className="primary" disabled={busy}>
+                {busy ? 'Saving Route…' : edit.id ? 'Save Changes' : 'Create Route'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteId && (
+        <Modal title="Delete Route?" onClose={() => setDeleteId(null)}>
+          <p>
+            Are you sure you want to delete this route? It will be deactivated and removed from customer familiar routes immediately.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+            <button className="secondary" onClick={() => setDeleteId(null)}>
+              Keep Route
+            </button>
+            <button
+              className="danger-button"
+              disabled={busy}
+              onClick={() => handleDelete(deleteId)}
+            >
+              {busy ? 'Deleting…' : 'Confirm Delete'}
+            </button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
