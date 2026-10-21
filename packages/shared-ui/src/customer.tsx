@@ -483,7 +483,7 @@ export default function CustomerApp() {
             Admin Portal <ExternalLink size={12} style={{ verticalAlign: 'middle' }} />
           </a>
         </div>
-        <small>© {new Date().getFullYear()} Miles & Moments Travel Technologies Pvt Ltd · Bengaluru, India</small>
+        <small>© {new Date().getFullYear()} Miles & Moments Travel Technologies Pvt Ltd · Kaup, Udupi, India</small>
       </footer>
 
       {auth && (
