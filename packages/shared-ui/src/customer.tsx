@@ -294,9 +294,9 @@ export default function CustomerApp() {
                 <a
                   className="primary"
                   href="/downloads/customer-app-latest.apk"
-                  download="dj-cabs-customer.apk"
+                  download="dj-cabs-v1.0.1.apk"
                 >
-                  <Download size={18} /> Download Android APK (57 MB)
+                  <Download size={18} /> Download Android APK (63 MB)
                 </a>
                 <button className="secondary" onClick={() => navigate('download')}>
                   Installation guide & QR code <ArrowRight size={16} />
@@ -1645,8 +1645,8 @@ function DownloadPage({
   onHome: () => void;
 }) {
   const downloadUrl = '/downloads/customer-app-latest.apk';
-  const apkVersion = settings?.apkVersion || '1.0.0';
-  const apkSize = settings?.apkSize && settings?.apkSize !== '24.8 MB' && settings?.apkSize !== '121 MB' ? settings.apkSize : '57 MB';
+  const apkVersion = settings?.apkVersion || '1.0.1';
+  const apkSize = settings?.apkSize && settings?.apkSize !== '24.8 MB' && settings?.apkSize !== '121 MB' ? settings.apkSize : '63 MB';
   const downloadFileName = `dj-cabs-v${apkVersion}.apk`;
 
   return (
