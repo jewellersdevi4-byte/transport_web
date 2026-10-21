@@ -1785,7 +1785,14 @@ function ReviewsPage({ token, onStatusChange }: { token: string; onStatusChange?
         {r.loading && !r.data ? (
           <Loading />
         ) : r.error ? (
-          <ErrorBox message={r.error} retry={r.reload} />
+          <ErrorBox
+            message={
+              r.error.includes('Endpoint not found')
+                ? 'Backend deployment pending: The review moderation endpoint has been pushed to git and is awaiting deployment on Render. Once Render finishes deploying the backend service (or if you click "Manual Deploy" in Render dashboard), click Retry below.'
+                : r.error
+            }
+            retry={r.reload}
+          />
         ) : feedbacks.length === 0 ? (
           <Empty title={`No ${statusFilter === 'ALL' ? '' : statusFilter.toLowerCase()} reviews found`}>
             <p>
