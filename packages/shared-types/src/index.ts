@@ -64,9 +64,24 @@ export type AdminPermission =
   | 'whatsapp'
   | 'notifications'
   | 'settings'
-  | 'admins';
+  | 'admins'
+  | 'entities';
 
-export type AdminRole = 'MASTER_ADMIN' | 'SUB_ADMIN' | 'SUPER_ADMIN' | 'DISPATCH_MANAGER' | 'OPERATIONS';
+export type AdminRole = 'MASTER_ADMIN' | 'ENTITY_ADMIN' | 'SUB_ADMIN' | 'SUPER_ADMIN' | 'DISPATCH_MANAGER' | 'OPERATIONS';
+
+export interface Entity {
+  id: string;
+  name: string;
+  slug: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  city?: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  settings?: Partial<Settings>;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface AdminUser {
   id: string;
@@ -75,6 +90,7 @@ export interface AdminUser {
   role: AdminRole;
   permissions: AdminPermission[];
   active: boolean;
+  entityId?: string;
   passwordHash?: string;
   createdAt: string;
   updatedAt?: string;
@@ -104,6 +120,7 @@ export interface VehicleDriverContact {
 
 export interface Vehicle {
   id: string;
+  entityId?: string;
   type: VehicleType;
   number?: string;
   model: string;
@@ -121,6 +138,7 @@ export type FeedbackStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface VehicleFeedback {
   id: string;
+  entityId?: string;
   vehicleId: string;
   vehicleModel?: string;
   bookingId?: string;
@@ -156,6 +174,7 @@ export interface VehiclePackage {
 
 export interface Driver {
   id: string;
+  entityId?: string;
   name: string;
   phone: string;
   license: string;
@@ -171,6 +190,8 @@ export interface Driver {
 }
 
 export interface Pricing {
+  id?: string;
+  entityId?: string;
   vehicleType: VehicleType;
   perKm: number;
   minimum: number;
@@ -179,6 +200,7 @@ export interface Pricing {
 
 export interface Route {
   id: string;
+  entityId?: string;
   origin: string;
   destination: string;
   distance: number;
@@ -215,6 +237,7 @@ export interface FareBreakdown {
 
 export interface Booking {
   id: string;
+  entityId?: string;
   bookingNumber: string;
   customerId: string;
   name: string;
@@ -369,6 +392,7 @@ export interface Store {
   settings: Settings;
   feedbacks?: VehicleFeedback[];
   adminUsers?: AdminUser[];
+  entities?: Entity[];
   emailOtps?: EmailOtpRecord[];
   whatsappSession?: WhatsAppSession;
 }

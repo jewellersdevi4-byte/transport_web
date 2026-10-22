@@ -43,9 +43,14 @@ import {
   UserPlus,
   Pencil,
   Lock,
+  Building2,
+  Globe,
+  ExternalLink,
+  Layers,
+  Briefcase,
 } from 'lucide-react';
-import type { Booking, Driver, Vehicle, VehiclePackage, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession, VehicleFeedback, AdminPermission, AdminRole, AdminUser } from '../../shared-types/src/index';
-import type { AdminFeedbackListResponse, AdminUserSummary } from '../../api-contracts/src/index';
+import type { Booking, Driver, Vehicle, VehiclePackage, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession, VehicleFeedback, AdminPermission, AdminRole, AdminUser, Entity } from '../../shared-types/src/index';
+import type { AdminFeedbackListResponse, AdminUserSummary, EntitySummary } from '../../api-contracts/src/index';
 import { LocationInput } from './location-input';
 import { transitions } from '../../shared-utils/src/index';
 import {
@@ -84,6 +89,7 @@ export default function AdminApp() {
   const [booking, setBooking] = useState('');
   const [menu, setMenu] = useState(false);
   const [version, setVersion] = useState(0);
+  const [selectedEntityId, setSelectedEntityId] = useState<string>('all');
 
   const adminProfile = useResource<{
     id: string;
@@ -91,14 +97,27 @@ export default function AdminApp() {
     email: string;
     role: AdminRole;
     permissions: AdminPermission[];
+    entityId?: string;
+    entity?: {
+      id: string;
+      name: string;
+      slug: string;
+      status: string;
+    };
   }>('/admin/me', session.token);
 
   const isMaster =
     adminProfile.data?.role === 'MASTER_ADMIN' ||
     adminProfile.data?.role === 'SUPER_ADMIN' ||
     adminProfile.data?.id === 'master-admin' ||
-    adminProfile.data?.id === 'admin' ||
-    Boolean(adminProfile.data?.permissions?.includes('admins'));
+    adminProfile.data?.id === 'admin';
+
+  const isEntityAdmin = adminProfile.data?.role === 'ENTITY_ADMIN';
+
+  const entitiesResource = useResource<{ entities: EntitySummary[] }>(
+    isMaster ? '/admin/entities' : '',
+    session.token
+  );
 
   const userPermissions: AdminPermission[] = isMaster
     ? [
@@ -113,12 +132,16 @@ export default function AdminApp() {
         'notifications',
         'settings',
         'admins',
+        'entities',
       ]
     : adminProfile.data?.permissions || ['dashboard'];
 
   const visibleNavigation = [
     ...ALL_ADMIN_MODULES.filter(([_, __, perm]) => userPermissions.includes(perm)),
-    ...(isMaster ? ([['Admins', Users, 'admins']] as const) : []),
+    ...(isMaster ? ([['Entities', Building2, 'entities']] as const) : []),
+    ...(isMaster
+      ? ([['Admins', Users, 'admins']] as const)
+      : (userPermissions.includes('admins') ? ([['Staff', Users, 'admins']] as const) : [])),
   ];
 
   useEffect(() => {
@@ -185,7 +208,9 @@ export default function AdminApp() {
               <Icon size={18} />
               {name}
               {name === 'Bookings' && <span className="nav-dot" />}
+              {name === 'Entities' && <span className="nav-dot" style={{ background: '#0284c7' }} />}
               {name === 'Admins' && <span className="nav-dot" style={{ background: '#9333ea' }} />}
+              {name === 'Staff' && <span className="nav-dot" style={{ background: '#10b981' }} />}
               {name === 'Reviews' && pendingCount > 0 && (
                 <span className="badge" style={{ marginLeft: 'auto', background: '#f59e0b', color: '#fff', fontSize: '0.72rem', padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>
                   {pendingCount}
@@ -198,15 +223,19 @@ export default function AdminApp() {
           <div className="workspace-mark">
             {isMaster ? (
               <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#9333ea' }} /> Master Admin
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#9333ea' }} /> Platform Master
+              </span>
+            ) : isEntityAdmin ? (
+              <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563eb' }} /> Entity Admin
               </span>
             ) : (
-              <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6' }} /> Sub-Admin
+              <span className="badge" style={{ background: '#f1f5f9', color: '#475569', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#64748b' }} /> Staff / Dispatch
               </span>
             )}
-            <strong>{adminProfile.data?.name || (isMaster ? 'Bengaluru Dispatch Hub' : 'Sub-Admin Workspace')}</strong>
-            <small>{adminProfile.data?.email || (isMaster ? 'Central Platform Authority' : 'Restricted Entity')}</small>
+            <strong>{adminProfile.data?.name || (isMaster ? 'Platform Provider' : 'Cab Operator Workspace')}</strong>
+            <small>{isMaster ? 'Central Multi-Entity Authority' : (adminProfile.data?.entity?.name || 'Isolated Entity')}</small>
           </div>
           <a
             href="/downloads/admin-app-latest.apk"
@@ -246,10 +275,43 @@ export default function AdminApp() {
           </span>
 
           <div className="header-right">
-            <span className="badge" style={{ background: isMaster ? '#f3e8ff' : '#eff6ff', color: isMaster ? '#6b21a8' : '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: isMaster ? '#9333ea' : '#3b82f6' }} />
-              {isMaster ? 'Master Authority' : 'Sub-Admin Workspace'}
-            </span>
+            {isMaster && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
+                <Building2 size={16} color="#7c3aed" />
+                <select
+                  aria-label="Filter by Entity"
+                  value={selectedEntityId}
+                  onChange={(e) => {
+                    setSelectedEntityId(e.target.value);
+                    setVersion((v) => v + 1);
+                  }}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 8,
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: '#1e293b',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="all">🏢 All Companies (Aggregated)</option>
+                  {(entitiesResource.data?.entities || []).map((ent) => (
+                    <option key={ent.id} value={ent.id}>
+                      {ent.status === 'SUSPENDED' ? '⛔ ' : '🏢 '} {ent.name} ({ent.city || ent.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {!isMaster && (
+              <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, padding: '5px 12px', marginRight: 8 }}>
+                🏢 {adminProfile.data?.entity?.name || 'Company Fleet'}
+              </span>
+            )}
+
             <button className="icon-button" aria-label="Notifications" onClick={() => setPage('Notifications')}>
               <Bell size={18} />
             </button>
@@ -257,8 +319,8 @@ export default function AdminApp() {
               {userInitials}
             </span>
             <span className="desktop">
-              {adminProfile.data?.name || (isMaster ? 'Master Admin' : 'Sub-Admin')}
-              <small>{isMaster ? 'Root Administrator' : `${visibleNavigation.length} modules granted`}</small>
+              {adminProfile.data?.name || (isMaster ? 'Master Admin' : 'Admin')}
+              <small>{isMaster ? 'Root Administrator' : (adminProfile.data?.entity?.name || 'Company Operations')}</small>
             </span>
           </div>
         </header>
@@ -274,40 +336,70 @@ export default function AdminApp() {
               }}
             />
           ) : page === 'Dashboard' ? (
-            <Dashboard token={session.token} open={setBooking} goBookings={() => setPage('Bookings')} />
+            <Dashboard
+              token={session.token}
+              open={setBooking}
+              goBookings={() => setPage('Bookings')}
+              entityId={isMaster ? selectedEntityId : undefined}
+            />
           ) : page === 'Bookings' ? (
-            <Bookings token={session.token} open={setBooking} />
+            <Bookings
+              token={session.token}
+              open={setBooking}
+              entityId={isMaster ? selectedEntityId : undefined}
+            />
           ) : page === 'Fleet' || page === 'Drivers' || page === 'Vehicles' ? (
-            <Fleet token={session.token} />
+            <Fleet
+              token={session.token}
+              entityId={isMaster ? selectedEntityId : undefined}
+            />
           ) : page === 'Routes' ? (
-            <RoutesPage token={session.token} />
+            <RoutesPage
+              token={session.token}
+              entityId={isMaster ? selectedEntityId : undefined}
+            />
           ) : page === 'Reviews' ? (
-            <ReviewsPage token={session.token} onStatusChange={() => pendingFeedback.reload()} />
+            <ReviewsPage
+              token={session.token}
+              onStatusChange={() => pendingFeedback.reload()}
+              entityId={isMaster ? selectedEntityId : undefined}
+            />
           ) : page === 'Pricing' ? (
-            <PricingPage token={session.token} />
+            <PricingPage
+              token={session.token}
+              entityId={isMaster ? selectedEntityId : undefined}
+            />
           ) : page === 'Reports' ? (
-            <Reports token={session.token} />
+            <Reports
+              token={session.token}
+              entityId={isMaster ? selectedEntityId : undefined}
+            />
           ) : page === 'WhatsApp' ? (
             <WhatsAppGatewayPage token={session.token} />
           ) : page === 'Notifications' ? (
             <Notifications token={session.token} />
-          ) : page === 'Admins' ? (
-            isMaster ? (
-              <AdminUsersManager token={session.token} />
-            ) : (
-              <div className="card" style={{ padding: 48, textAlign: 'center', maxWidth: 540, margin: '40px auto' }}>
-                <ShieldAlert size={48} color="#ef4444" style={{ margin: '0 auto 16px' }} />
-                <h2>Access Restricted</h2>
-                <p className="muted" style={{ marginBottom: 20 }}>
-                  Administrator management is restricted to the Master Admin. Sub-admins operate as isolated entities and cannot view or manage other administrators.
-                </p>
-                <button className="primary" onClick={() => setPage(visibleNavigation[0]?.[0] || 'Dashboard')}>
-                  Go to Permitted Modules
-                </button>
-              </div>
-            )
+          ) : page === 'Entities' && isMaster ? (
+            <EntitiesManager
+              token={session.token}
+              onSelectEntity={(slug) => {
+                setSelectedEntityId(slug);
+                setPage('Dashboard');
+              }}
+            />
+          ) : page === 'Admins' || page === 'Staff' ? (
+            <AdminUsersManager
+              token={session.token}
+              isMaster={isMaster}
+              currentEntityId={adminProfile.data?.entityId || 'dj-cabs'}
+              entityName={adminProfile.data?.entity?.name || 'DJ Cabs'}
+              entities={entitiesResource.data?.entities || []}
+              selectedEntityFilter={isMaster ? selectedEntityId : undefined}
+            />
           ) : (
-            <SettingsPage token={session.token} />
+            <SettingsPage
+              token={session.token}
+              entityId={isMaster ? selectedEntityId : undefined}
+            />
           )}
         </main>
       </div>
@@ -369,17 +461,20 @@ function Dashboard({
   token,
   open,
   goBookings,
+  entityId,
 }: {
   token: string;
   open: (id: string) => void;
   goBookings: () => void;
+  entityId?: string;
 }) {
+  const query = entityId && entityId !== 'all' ? `?entityId=${encodeURIComponent(entityId)}` : '';
   const r = useResource<{
     bookings: Booking[];
     notifications: Notice[];
     drivers: Driver[];
     vehicles: Vehicle[];
-  }>('/admin/dashboard', token);
+  }>(`/admin/dashboard${query}`, token);
 
   if (r.loading) return <Loading />;
   if (r.error || !r.data) return <ErrorBox message={r.error} retry={r.reload} />;
@@ -640,10 +735,11 @@ function BookingTable({ bookings, open }: { bookings: Booking[]; open: (id: stri
   );
 }
 
-function Bookings({ token, open }: { token: string; open: (id: string) => void }) {
+function Bookings({ token, open, entityId }: { token: string; open: (id: string) => void; entityId?: string }) {
   const [filters, setFilters] = useState({ search: '', date: '', status: '', vehicle: '', payment: '', driver: '' });
-  const r = useResource<Booking[]>(`/admin/bookings?${new URLSearchParams(filters)}`, token);
-  const drivers = useResource<Driver[]>('/admin/drivers', token);
+  const allParams = { ...filters, ...(entityId && entityId !== 'all' ? { entityId } : {}) };
+  const r = useResource<Booking[]>(`/admin/bookings?${new URLSearchParams(allParams)}`, token);
+  const drivers = useResource<Driver[]>(`/admin/drivers${entityId && entityId !== 'all' ? `?entityId=${encodeURIComponent(entityId)}` : ''}`, token);
 
   return (
     <>
@@ -1284,9 +1380,10 @@ async function compressImageFile(file: File, maxWidth = 1000, maxHeight = 750, q
   });
 }
 
-function Fleet({ token }: { token: string }) {
-  const r = useResource<(Vehicle & { driverName?: string; driverPhone?: string; driverLicense?: string })[]>('/admin/vehicles', token);
-  const settings = useResource<Settings>('/admin/settings', token);
+function Fleet({ token, entityId }: { token: string; entityId?: string }) {
+  const entityQuery = entityId && entityId !== 'all' ? `?entityId=${encodeURIComponent(entityId)}` : '';
+  const r = useResource<(Vehicle & { driverName?: string; driverPhone?: string; driverLicense?: string })[]>(`/admin/vehicles${entityQuery}`, token);
+  const settings = useResource<Settings>(`/admin/settings${entityQuery}`, token);
   const [query, setQuery] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -1789,18 +1886,19 @@ function Fleet({ token }: { token: string }) {
   );
 }
 
-function ReviewsPage({ token, onStatusChange }: { token: string; onStatusChange?: () => void }) {
+function ReviewsPage({ token, onStatusChange, entityId }: { token: string; onStatusChange?: () => void; entityId?: string }) {
   const [statusFilter, setStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING');
   const [vehicleFilter, setVehicleFilter] = useState('');
   const [search, setSearch] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
+  const query = entityId && entityId !== 'all' ? `&entityId=${encodeURIComponent(entityId)}` : '';
   const r = useResource<AdminFeedbackListResponse>(
-    `/admin/feedback?status=${statusFilter}${vehicleFilter ? `&vehicleId=${encodeURIComponent(vehicleFilter)}` : ''}`,
+    `/admin/feedback?status=${statusFilter}${vehicleFilter ? `&vehicleId=${encodeURIComponent(vehicleFilter)}` : ''}${query}`,
     token
   );
-  const vehicles = useResource<Vehicle[]>('/admin/vehicles', token);
+  const vehicles = useResource<Vehicle[]>(`/admin/vehicles${entityId && entityId !== 'all' ? `?entityId=${encodeURIComponent(entityId)}` : ''}`, token);
 
   const handleUpdateStatus = async (id: string, newStatus: 'APPROVED' | 'REJECTED') => {
     setUpdatingId(id);
@@ -2314,8 +2412,9 @@ function RouteEditModal({
   );
 }
 
-function RoutesPage({ token }: { token: string }) {
-  const routes = useResource<Route[]>('/admin/routes', token);
+function RoutesPage({ token, entityId }: { token: string; entityId?: string }) {
+  const query = entityId && entityId !== 'all' ? `?entityId=${encodeURIComponent(entityId)}` : '';
+  const routes = useResource<Route[]>(`/admin/routes${query}`, token);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [edit, setEdit] = useState<Route | null>(null);
@@ -2595,9 +2694,10 @@ function RoutesPage({ token }: { token: string }) {
   );
 }
 
-function PricingPage({ token }: { token: string }) {
-  const r = useResource<Pricing[]>('/admin/pricing', token);
-  const routes = useResource<Route[]>('/admin/routes', token);
+function PricingPage({ token, entityId }: { token: string; entityId?: string }) {
+  const query = entityId && entityId !== 'all' ? `?entityId=${encodeURIComponent(entityId)}` : '';
+  const r = useResource<Pricing[]>(`/admin/pricing${query}`, token);
+  const routes = useResource<Route[]>(`/admin/routes${query}`, token);
   const [pricing, setPricing] = useState<Pricing[]>([]);
   const [edit, setEdit] = useState<Route | null>(null);
   const [error, setError] = useState('');
@@ -2710,13 +2810,14 @@ function PricingPage({ token }: { token: string }) {
   );
 }
 
-function Reports({ token }: { token: string }) {
+function Reports({ token, entityId }: { token: string; entityId?: string }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [vehicle, setVehicle] = useState('');
   const [driver, setDriver] = useState('');
   const [status, setStatus] = useState('');
-  const r = useResource<Store>(`/admin/reports?${new URLSearchParams({ from, to })}`, token);
+  const allParams = { from, to, ...(entityId && entityId !== 'all' ? { entityId } : {}) };
+  const r = useResource<Store>(`/admin/reports?${new URLSearchParams(allParams)}`, token);
 
   const bookings = (r.data?.bookings || []).filter(
     (b) =>
@@ -3003,8 +3104,9 @@ function Notifications({ token }: { token: string }) {
   );
 }
 
-function SettingsPage({ token }: { token: string }) {
-  const r = useResource<Settings & { providers: Record<string, string> }>('/admin/settings', token);
+function SettingsPage({ token, entityId }: { token: string; entityId?: string }) {
+  const query = entityId && entityId !== 'all' ? `?entityId=${encodeURIComponent(entityId)}` : '';
+  const r = useResource<Settings & { providers: Record<string, string> }>(`/admin/settings${query}`, token);
   const [form, setForm] = useState<Settings | null>(null);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -3028,7 +3130,7 @@ function SettingsPage({ token }: { token: string }) {
           e.preventDefault();
           setBusy(true);
           try {
-            await api('/admin/settings', { token, method: 'PUT', body: form });
+            await api(`/admin/settings${query}`, { token, method: 'PUT', body: form });
             setSaved(true);
             setError('');
           } catch (e) {
@@ -3754,6 +3856,621 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
   );
 }
 
+// Multi-Tenant SaaS Entities Hub (Master Admin Console)
+function EntitiesManager({
+  token,
+  onSelectEntity,
+}: {
+  token: string;
+  onSelectEntity: (slug: string) => void;
+}) {
+  const entitiesResource = useResource<{ entities: EntitySummary[] }>('/admin/entities', token);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'SUSPENDED'>('ALL');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editEntity, setEditEntity] = useState<EntitySummary | null>(null);
+
+  // Form State
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [city, setCity] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+
+  const openCreateModal = () => {
+    setEditEntity(null);
+    setName('');
+    setSlug('');
+    setCity('Kaup, Udupi');
+    setContactName('');
+    setContactEmail('');
+    setContactPhone('');
+    setAdminEmail('');
+    setAdminPassword('');
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openEditModal = (entity: EntitySummary) => {
+    setEditEntity(entity);
+    setName(entity.name);
+    setSlug(entity.slug);
+    setCity(entity.city || '');
+    setContactName(entity.contactName);
+    setContactEmail(entity.contactEmail);
+    setContactPhone(entity.contactPhone);
+    setAdminEmail('');
+    setAdminPassword('');
+    setError('');
+    setModalOpen(true);
+  };
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!editEntity) {
+      const generated = val
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      setSlug(generated);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError('Company name is required.');
+      return;
+    }
+    if (!slug.trim() || !/^[a-z0-9-]+$/.test(slug)) {
+      setError('URL slug must consist of lowercase letters, numbers, and hyphens only.');
+      return;
+    }
+    if (!contactName.trim() || !contactEmail.trim() || !contactPhone.trim()) {
+      setError('Please provide complete contact information for this company.');
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      if (editEntity) {
+        await api(`/admin/entities/${editEntity.id}`, {
+          token,
+          method: 'PUT',
+          body: {
+            name: name.trim(),
+            contactName: contactName.trim(),
+            contactEmail: contactEmail.trim().toLowerCase(),
+            contactPhone: contactPhone.trim(),
+            city: city.trim(),
+          },
+        });
+        setSuccess(`Company "${name}" details updated.`);
+      } else {
+        await api('/admin/entities', {
+          token,
+          method: 'POST',
+          body: {
+            name: name.trim(),
+            slug: slug.trim().toLowerCase(),
+            city: city.trim(),
+            contactName: contactName.trim(),
+            contactEmail: contactEmail.trim().toLowerCase(),
+            contactPhone: contactPhone.trim(),
+            adminEmail: adminEmail.trim() ? adminEmail.trim().toLowerCase() : undefined,
+            adminPassword: adminPassword || undefined,
+          },
+        });
+        setSuccess(`Cab company "${name}" onboarded successfully.`);
+      }
+      setModalOpen(false);
+      entitiesResource.reload();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to save entity.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleSuspend = async (entity: EntitySummary) => {
+    const isSuspending = entity.status === 'ACTIVE';
+    if (isSuspending && entity.slug === 'dj-cabs') {
+      alert('The primary default entity (DJ Cabs) cannot be suspended.');
+      return;
+    }
+    if (!confirm(`Are you sure you want to ${isSuspending ? 'suspend' : 'reactivate'} "${entity.name}"? ${isSuspending ? 'Their admin users will be blocked from logging in.' : ''}`)) {
+      return;
+    }
+    setActionBusyId(entity.id);
+    try {
+      if (isSuspending) {
+        await api(`/admin/entities/${entity.id}`, { token, method: 'DELETE' });
+      } else {
+        await api(`/admin/entities/${entity.id}`, { token, method: 'PUT', body: { status: 'ACTIVE' } });
+      }
+      entitiesResource.reload();
+      setSuccess(`Company "${entity.name}" is now ${isSuspending ? 'SUSPENDED' : 'ACTIVE'}.`);
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      alert((err as Error).message || 'Failed to update company status.');
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
+  const copyBookingLink = (s: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = `${origin}/?entity=${s}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    setCopiedSlug(s);
+    setTimeout(() => setCopiedSlug(null), 2500);
+  };
+
+  const allEntities = entitiesResource.data?.entities || [];
+  const activeCount = allEntities.filter((e) => e.status === 'ACTIVE').length;
+  const suspendedCount = allEntities.length - activeCount;
+  const totalVehicles = allEntities.reduce((sum, e) => sum + (e.vehicleCount || 0), 0);
+  const totalBookings = allEntities.reduce((sum, e) => sum + (e.bookingCount || 0), 0);
+
+  const filtered = allEntities.filter((e) => {
+    if (statusFilter === 'ACTIVE' && e.status !== 'ACTIVE') return false;
+    if (statusFilter === 'SUSPENDED' && e.status !== 'SUSPENDED') return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      e.name.toLowerCase().includes(q) ||
+      e.slug.toLowerCase().includes(q) ||
+      (e.city || '').toLowerCase().includes(q) ||
+      e.contactName.toLowerCase().includes(q) ||
+      e.contactEmail.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <>
+      <Heading
+        eyebrow="MULTI-TENANT PLATFORM OPERATIONS"
+        title="Partner Fleet Entities"
+        description="Master Admin directory of onboarded cab operators. Monitor isolated fleet deployments, manage access status, and inspect per-company performance."
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={openCreateModal}
+            >
+              <Plus size={16} /> Onboard Cab Company
+            </button>
+            <button
+              className="secondary"
+              onClick={() => entitiesResource.reload()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </div>
+        }
+      />
+
+      {success && (
+        <div className="card" style={{ padding: '12px 16px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 8, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: '0.9rem' }}>
+          <CheckCircle2 size={18} color="#10b981" /> {success}
+        </div>
+      )}
+
+      {entitiesResource.error && <ErrorBox message={entitiesResource.error} />}
+
+      {/* Overview Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 20 }}>
+        <div className="card" style={{ padding: '16px 20px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Companies</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', marginTop: 4 }}>
+            {allEntities.length} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>({activeCount} Active)</span>
+          </div>
+        </div>
+        <div className="card" style={{ padding: '16px 20px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>Aggregated Fleet</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#15803d', marginTop: 4 }}>{totalVehicles} Vehicles</div>
+        </div>
+        <div className="card" style={{ padding: '16px 20px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Platform Bookings</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1d4ed8', marginTop: 4 }}>{totalBookings} Bookings</div>
+        </div>
+        <div className="card" style={{ padding: '16px 20px', background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6b21a8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Tenant Isolation</span>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#581c87', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ShieldCheck size={18} color="#7c3aed" /> Full Data Segregation
+          </div>
+          <small style={{ color: '#7e22ce', fontSize: '0.75rem' }}>Entities cannot view or touch other operators' data.</small>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="card panel" style={{ marginBottom: 20 }}>
+        <div className="section-title" style={{ flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h2>Active Entities ({filtered.length})</h2>
+            <p className="muted" style={{ fontSize: '0.84rem' }}>
+              Each company operates under an isolated workspace with dedicated vehicles, drivers, rate cards, and customer dispatch links.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name, slug, city..."
+                style={{ paddingLeft: 32, fontSize: '0.85rem', width: 260, height: 34, borderRadius: 6, border: '1px solid #cbd5e1' }}
+              />
+            </div>
+            <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: 2, borderRadius: 6 }}>
+              {(['ALL', 'ACTIVE', 'SUSPENDED'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setStatusFilter(mode)}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: statusFilter === mode ? 700 : 500,
+                    background: statusFilter === mode ? '#ffffff' : 'transparent',
+                    color: statusFilter === mode ? '#0f172a' : '#64748b',
+                    borderRadius: 4,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: statusFilter === mode ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  }}
+                >
+                  {mode === 'ALL' ? `All (${allEntities.length})` : mode === 'ACTIVE' ? `Active (${activeCount})` : `Suspended (${suspendedCount})`}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <Empty title={allEntities.length === 0 ? 'No partner entities yet' : 'No matching companies found'}>
+            {allEntities.length === 0
+              ? 'Click "+ Onboard Cab Company" above to register your first partner entity.'
+              : 'Try clearing your search query or status filter.'}
+          </Empty>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
+            {filtered.map((entity) => {
+              const isBusy = actionBusyId === entity.id;
+              const isDefault = entity.slug === 'dj-cabs';
+              return (
+                <div
+                  key={entity.id}
+                  className="card"
+                  style={{
+                    padding: '18px 20px',
+                    background: '#ffffff',
+                    border: entity.status === 'SUSPENDED' ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+                    borderRadius: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <strong style={{ fontSize: '1.1rem', color: '#0f172a' }}>{entity.name}</strong>
+                          {isDefault && (
+                            <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', fontSize: '0.68rem', fontWeight: 800 }}>PRIMARY DEFAULT</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>slug:</span>
+                          <code style={{ fontSize: '0.78rem', background: '#f1f5f9', padding: '1px 6px', borderRadius: 4, color: '#334155' }}>
+                            {entity.slug}
+                          </code>
+                          {entity.city && (
+                            <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              • <MapPin size={12} /> {entity.city}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        {entity.status === 'ACTIVE' ? (
+                          <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontSize: '0.72rem', fontWeight: 700 }}>
+                            ACTIVE
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ background: '#fee2e2', color: '#991b1b', fontSize: '0.72rem', fontWeight: 700 }}>
+                            SUSPENDED
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Contact Info */}
+                    <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 8, fontSize: '0.8rem', color: '#334155', marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: '#64748b' }}>Contact:</span>
+                        <strong>{entity.contactName}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: '#64748b' }}>Phone:</span>
+                        <span>{entity.contactPhone}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748b' }}>Email:</span>
+                        <span>{entity.contactEmail}</span>
+                      </div>
+                    </div>
+
+                    {/* Stats Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14, textAlign: 'center' }}>
+                      <div style={{ background: '#eff6ff', padding: '6px 8px', borderRadius: 6 }}>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1d4ed8' }}>{entity.vehicleCount || 0}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#3b82f6', fontWeight: 600 }}>Vehicles</div>
+                      </div>
+                      <div style={{ background: '#f0fdf4', padding: '6px 8px', borderRadius: 6 }}>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#15803d' }}>{entity.driverCount || 0}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>Chauffeurs</div>
+                      </div>
+                      <div style={{ background: '#faf5ff', padding: '6px 8px', borderRadius: 6 }}>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#6b21a8' }}>{entity.bookingCount || 0}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#9333ea', fontWeight: 600 }}>Bookings</div>
+                      </div>
+                    </div>
+
+                    {/* Customer Direct Link */}
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Customer Booking Link:</span>
+                        <button
+                          type="button"
+                          className="secondary small"
+                          onClick={() => copyBookingLink(entity.slug)}
+                          style={{ fontSize: '0.7rem', padding: '1px 6px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        >
+                          {copiedSlug === entity.slug ? <Check size={11} color="#16a34a" /> : <Copy size={11} />}
+                          {copiedSlug === entity.slug ? 'Copied!' : 'Copy Link'}
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', padding: '6px 10px', borderRadius: 6, fontSize: '0.75rem' }}>
+                        <Globe size={13} color="#64748b" />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1e293b', flex: 1 }}>
+                          /?entity={entity.slug}
+                        </span>
+                        <a
+                          href={`/?entity=${entity.slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: '#2563eb', display: 'inline-flex', alignItems: 'center' }}
+                          title="Open Customer Page"
+                        >
+                          <ExternalLink size={13} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Footer */}
+                  <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+                    <button
+                      type="button"
+                      className="primary small"
+                      onClick={() => onSelectEntity(entity.id)}
+                      style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.78rem' }}
+                    >
+                      <Layers size={13} /> Inspect Fleet
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      onClick={() => openEditModal(entity)}
+                      disabled={isBusy}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.78rem' }}
+                    >
+                      <Pencil size={13} /> Edit
+                    </button>
+                    {!isDefault && (
+                      <button
+                        type="button"
+                        className="secondary small"
+                        onClick={() => handleToggleSuspend(entity)}
+                        disabled={isBusy}
+                        style={{
+                          fontSize: '0.78rem',
+                          color: entity.status === 'ACTIVE' ? '#dc2626' : '#16a34a',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {entity.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Onboard / Edit Entity Modal */}
+      {modalOpen && (
+        <Modal
+          title={editEntity ? `Edit Company: ${editEntity.name}` : 'Onboard Partner Cab Company'}
+          onClose={() => !busy && setModalOpen(false)}
+        >
+          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {error && <ErrorBox message={error} />}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                  Company Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="e.g. Star Cabs"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                  URL Slug * (lowercase & hyphens)
+                </label>
+                <input
+                  type="text"
+                  required
+                  disabled={Boolean(editEntity)}
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="e.g. star-cabs"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: editEntity ? '#f1f5f9' : '#fff' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                Operating Region / City
+              </label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="e.g. Kaup, Udupi or Mangaluru"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+              />
+            </div>
+
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+              <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Primary Contact Information</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                    Contact Person *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    placeholder="e.g. Rajesh Kumar"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                    Contact Phone *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="e.g. +91 98888 77777"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                  Contact Email *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="e.g. contact@starcabs.local"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            {!editEntity && (
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, background: '#faf5ff', padding: '12px 14px', borderRadius: 8, border: '1px solid #e9d5ff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <ShieldCheck size={16} color="#7c3aed" />
+                  <strong style={{ fontSize: '0.88rem', color: '#581c87' }}>Initial Entity Admin Account (Optional)</strong>
+                </div>
+                <p className="muted" style={{ fontSize: '0.78rem', margin: '0 0 10px 0' }}>
+                  Auto-create credentials for this company's owner/administrator. They can sign in immediately to manage their fleet.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                      Admin Email
+                    </label>
+                    <input
+                      type="email"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      placeholder="admin@starcabs.local"
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                      Admin Password
+                    </label>
+                    <input
+                      type="password"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      placeholder="Min 6 characters"
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setModalOpen(false)}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary"
+                disabled={busy}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                {busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}
+                {editEntity ? 'Save Changes' : 'Onboard Company'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
+
 const AVAILABLE_PERMISSIONS: { id: AdminPermission; label: string; description: string; icon: any }[] = [
   { id: 'dashboard', label: 'Dashboard & Metrics', description: 'Overview metrics, charts & system analytics', icon: LayoutDashboard },
   { id: 'bookings', label: 'Bookings & Dispatch', description: 'Manage bookings, assign chauffeurs & track journeys', icon: CalendarDays },
@@ -3765,10 +4482,27 @@ const AVAILABLE_PERMISSIONS: { id: AdminPermission; label: string; description: 
   { id: 'whatsapp', label: 'WhatsApp Gateway', description: 'Live WhatsApp pairing, QR scan & messaging logs', icon: MessageSquare },
   { id: 'notifications', label: 'Notifications & Alerts', description: 'Send outbound push, SMS & WhatsApp notifications', icon: Bell },
   { id: 'settings', label: 'Business Settings', description: 'Business profile, legal policies & mobile app APK links', icon: SettingsIcon },
+  { id: 'admins', label: 'Staff Management', description: 'Internal dispatchers, staff accounts & access control', icon: Users },
 ];
 
-function AdminUsersManager({ token }: { token: string }) {
-  const usersResource = useResource<{ users: AdminUserSummary[] }>('/admin/users', token);
+function AdminUsersManager({
+  token,
+  isMaster = false,
+  currentEntityId = 'dj-cabs',
+  entityName = 'DJ Cabs',
+  entities = [],
+  selectedEntityFilter,
+}: {
+  token: string;
+  isMaster?: boolean;
+  currentEntityId?: string;
+  entityName?: string;
+  entities?: EntitySummary[];
+  selectedEntityFilter?: string;
+}) {
+  const [entityFilter, setEntityFilter] = useState(selectedEntityFilter || 'all');
+  const query = isMaster && entityFilter && entityFilter !== 'all' ? `?entityId=${encodeURIComponent(entityFilter)}` : '';
+  const usersResource = useResource<{ users: AdminUserSummary[] }>(`/admin/users${query}`, token);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [modalOpen, setModalOpen] = useState(false);
@@ -3778,6 +4512,8 @@ function AdminUsersManager({ token }: { token: string }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<AdminRole>('SUB_ADMIN');
+  const [targetEntityId, setTargetEntityId] = useState<string>(currentEntityId);
   const [active, setActive] = useState(true);
   const [permissions, setPermissions] = useState<AdminPermission[]>(['dashboard', 'bookings']);
   const [busy, setBusy] = useState(false);
@@ -3790,8 +4526,10 @@ function AdminUsersManager({ token }: { token: string }) {
     setName('');
     setEmail('');
     setPassword('');
+    setRole(isMaster ? 'ENTITY_ADMIN' : 'DISPATCH_MANAGER');
+    setTargetEntityId(isMaster ? (entities[0]?.id || currentEntityId) : currentEntityId);
     setActive(true);
-    setPermissions(['dashboard', 'bookings']);
+    setPermissions(isMaster ? ['dashboard', 'bookings', 'fleet', 'routes', 'reviews', 'pricing', 'reports', 'settings'] : ['dashboard', 'bookings', 'fleet']);
     setError('');
     setModalOpen(true);
   };
@@ -3801,6 +4539,8 @@ function AdminUsersManager({ token }: { token: string }) {
     setName(user.name);
     setEmail(user.email);
     setPassword('');
+    setRole(user.role || 'SUB_ADMIN');
+    setTargetEntityId(user.entityId || currentEntityId);
     setActive(user.active);
     setPermissions(user.permissions || []);
     setError('');
@@ -3836,40 +4576,43 @@ function AdminUsersManager({ token }: { token: string }) {
       return;
     }
     if (permissions.length === 0) {
-      setError('Please select at least one permission module for this administrator.');
+      setError('Please select at least one permission module.');
       return;
     }
 
     setBusy(true);
     setError('');
     try {
-      if (editingUser) {
-        await api(`/admin/users/${editingUser.id}`, {
-          token,
-          method: 'PUT',
-          body: {
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-            password: password.trim() || undefined,
-            permissions,
-            active,
-          },
-        });
-        setSuccess(`Administrator "${name}" updated successfully.`);
-      } else {
+      const payload: any = {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: password.trim() || undefined,
+        permissions,
+        active,
+      };
+
+      if (!editingUser) {
+        payload.role = role;
+        payload.entityId = isMaster ? (role === 'MASTER_ADMIN' ? undefined : targetEntityId) : currentEntityId;
         await api('/admin/users', {
           token,
           method: 'POST',
-          body: {
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-            password: password.trim(),
-            permissions,
-            role: 'SUB_ADMIN',
-          },
+          body: payload,
         });
-        setSuccess(`Administrator "${name}" created successfully.`);
+        setSuccess(`User "${name}" created successfully.`);
+      } else {
+        if (isMaster) {
+          payload.role = role;
+          payload.entityId = role === 'MASTER_ADMIN' ? undefined : targetEntityId;
+        }
+        await api(`/admin/users/${editingUser.id}`, {
+          token,
+          method: 'PUT',
+          body: payload,
+        });
+        setSuccess(`User "${name}" updated successfully.`);
       }
+
       setModalOpen(false);
       usersResource.reload();
       setTimeout(() => setSuccess(''), 4000);
@@ -3890,14 +4633,14 @@ function AdminUsersManager({ token }: { token: string }) {
       });
       usersResource.reload();
     } catch (err) {
-      alert((err as Error).message || 'Failed to update admin status.');
+      alert((err as Error).message || 'Failed to update user status.');
     } finally {
       setActionBusyId(null);
     }
   };
 
   const handleDelete = async (user: AdminUserSummary) => {
-    if (!confirm(`Are you sure you want to permanently delete administrator "${user.name}" (${user.email})? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to permanently remove "${user.name}" (${user.email})?`)) {
       return;
     }
     setActionBusyId(user.id);
@@ -3907,10 +4650,10 @@ function AdminUsersManager({ token }: { token: string }) {
         method: 'DELETE',
       });
       usersResource.reload();
-      setSuccess(`Administrator "${user.name}" removed successfully.`);
+      setSuccess(`User "${user.name}" removed successfully.`);
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
-      alert((err as Error).message || 'Failed to delete administrator.');
+      alert((err as Error).message || 'Failed to delete user.');
     } finally {
       setActionBusyId(null);
     }
@@ -3928,6 +4671,8 @@ function AdminUsersManager({ token }: { token: string }) {
     return (
       u.name.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q) ||
+      (u.role || '').toLowerCase().includes(q) ||
+      (u.entityId || '').toLowerCase().includes(q) ||
       (u.permissions || []).some((p) => p.toLowerCase().includes(q))
     );
   });
@@ -3935,9 +4680,13 @@ function AdminUsersManager({ token }: { token: string }) {
   return (
     <>
       <Heading
-        eyebrow="ACCESS CONTROL & ENTITY ISOLATION"
-        title="Administrator Management"
-        description="Master Admin console to create and manage sub-administrators with custom permissions. Each sub-admin operates in an isolated environment without access to other admins."
+        eyebrow={isMaster ? 'PLATFORM ROLES & ENTITY ACCESS' : 'INTERNAL PERSONNEL'}
+        title={isMaster ? 'Administrators & Personnel' : `${entityName} Staff & Dispatchers`}
+        description={
+          isMaster
+            ? 'Central administration to create Master Admins, assign Entity Admins to partner companies, and delegate dispatch staff.'
+            : `Manage internal dispatchers, operations team, and booking staff for ${entityName}.`
+        }
         action={
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -3945,7 +4694,7 @@ function AdminUsersManager({ token }: { token: string }) {
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               onClick={openCreateModal}
             >
-              <UserPlus size={16} /> Add Administrator
+              <UserPlus size={16} /> {isMaster ? 'Add Administrator' : 'Add Staff Member'}
             </button>
             <button
               className="secondary"
@@ -3969,68 +4718,72 @@ function AdminUsersManager({ token }: { token: string }) {
       {/* Metrics Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 20 }}>
         <div className="card" style={{ padding: '16px 20px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total System Admins</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            {isMaster ? 'Total Registered Users' : 'Total Company Staff'}
+          </span>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', marginTop: 4 }}>
-            {1 + allUsers.length} <span style={{ fontSize: '0.9rem', fontWeight: 500, color: '#64748b' }}>(1 Master + {allUsers.length} Sub)</span>
+            {allUsers.length} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#64748b' }}>({activeCount} Active)</span>
           </div>
         </div>
         <div className="card" style={{ padding: '16px 20px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12 }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Sub-Admins</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Status</span>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#15803d', marginTop: 4 }}>{activeCount} Active</div>
         </div>
         <div className="card" style={{ padding: '16px 20px', background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 12 }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6b21a8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Entity Isolation Model</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6b21a8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Isolation Security</span>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: '#581c87', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ShieldCheck size={18} color="#7c3aed" /> Strict RBAC Enforcement
+            <ShieldCheck size={18} color="#7c3aed" /> Scoped Boundary
           </div>
-          <small style={{ color: '#7e22ce', fontSize: '0.75rem' }}>Sub-admins cannot view or manage other administrators.</small>
+          <small style={{ color: '#7e22ce', fontSize: '0.75rem' }}>
+            {isMaster ? 'Master Admin manages cross-entity credentials.' : 'Staff can only see journeys for this company.'}
+          </small>
         </div>
       </div>
 
-      {/* Master Admin Root Authority Card */}
-      <div className="card" style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #cbd5e1', borderRadius: 12, marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#7c3aed', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <strong style={{ fontSize: '1.05rem', color: '#0f172a' }}>Platform Master Admin</strong>
-                <span className="badge" style={{ background: '#7c3aed', color: '#fff', fontSize: '0.72rem', fontWeight: 800 }}>ROOT AUTHORITY</span>
-                <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontSize: '0.72rem', fontWeight: 700 }}>PERMANENT ACTIVE</span>
-              </div>
-              <p className="muted" style={{ fontSize: '0.84rem', marginTop: 2, marginBottom: 0 }}>
-                Root platform administrator with unrestricted access to all dispatch, fleet, routes, pricing, reports, settings, and administrator assignment modules.
-              </p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Lock size={14} /> Immutable System Entity
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Sub-Admins List */}
+      {/* Users List Panel */}
       <div className="card panel">
         <div className="section-title" style={{ flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h2>Assigned Sub-Administrators ({allUsers.length})</h2>
+            <h2>{isMaster ? `Platform Personnel (${allUsers.length})` : `Staff Directory (${allUsers.length})`}</h2>
             <p className="muted" style={{ fontSize: '0.84rem' }}>
-              Sub-admins only have access to the modules explicitly checked below. They cannot view other administrators or platform credentials.
+              {isMaster
+                ? 'Accounts across all partner entities. Filter by company or search by name.'
+                : `Internal dispatch and operations team for ${entityName}.`}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {isMaster && (
+              <select
+                aria-label="Filter user entity"
+                value={entityFilter}
+                onChange={(e) => setEntityFilter(e.target.value)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #cbd5e1',
+                  background: '#fff',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  height: 34,
+                }}
+              >
+                <option value="all">🏢 All Entities</option>
+                {entities.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <div style={{ position: 'relative' }}>
               <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name, email, or permission..."
-                style={{ paddingLeft: 32, fontSize: '0.85rem', width: 260, height: 34, borderRadius: 6, border: '1px solid #cbd5e1' }}
+                placeholder="Search name, email, role..."
+                style={{ paddingLeft: 32, fontSize: '0.85rem', width: 220, height: 34, borderRadius: 6, border: '1px solid #cbd5e1' }}
               />
             </div>
             <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: 2, borderRadius: 6 }}>
@@ -4059,9 +4812,9 @@ function AdminUsersManager({ token }: { token: string }) {
         </div>
 
         {filteredUsers.length === 0 ? (
-          <Empty title={allUsers.length === 0 ? 'No sub-administrators created yet' : 'No matching sub-administrators found'}>
+          <Empty title={allUsers.length === 0 ? 'No accounts created yet' : 'No matching users found'}>
             {allUsers.length === 0
-              ? 'Click "+ Add Administrator" above to create an isolated administrator account with custom permissions.'
+              ? 'Click "+ Add" above to register an account with specific module permissions.'
               : 'Try clearing your search query or status filter.'}
           </Empty>
         ) : (
@@ -4069,10 +4822,11 @@ function AdminUsersManager({ token }: { token: string }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left', fontSize: '0.78rem', color: '#64748b' }}>
-                  <th style={{ padding: '10px 12px' }}>ADMINISTRATOR</th>
-                  <th style={{ padding: '10px 12px' }}>ASSIGNED PERMISSIONS</th>
+                  <th style={{ padding: '10px 12px' }}>NAME & EMAIL</th>
+                  <th style={{ padding: '10px 12px' }}>ROLE</th>
+                  {isMaster && <th style={{ padding: '10px 12px' }}>ASSIGNED ENTITY</th>}
+                  <th style={{ padding: '10px 12px' }}>PERMISSIONS</th>
                   <th style={{ padding: '10px 12px' }}>STATUS</th>
-                  <th style={{ padding: '10px 12px' }}>CREATED</th>
                   <th style={{ padding: '10px 12px', textAlign: 'right' }}>ACTIONS</th>
                 </tr>
               </thead>
@@ -4080,11 +4834,22 @@ function AdminUsersManager({ token }: { token: string }) {
                 {filteredUsers.map((u) => {
                   const isBusy = actionBusyId === u.id;
                   const initials = u.name.split(' ').map((n) => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'AD';
+                  const matchedEntity = entities.find((e) => e.id === u.entityId || e.slug === u.entityId);
+                  const isUserMaster = u.role === 'MASTER_ADMIN' || u.role === 'SUPER_ADMIN';
+
                   return (
                     <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span className="avatar small-avatar" style={{ background: u.active ? '#3b82f6' : '#94a3b8', color: '#fff', fontSize: '0.8rem', fontWeight: 700 }}>
+                          <span
+                            className="avatar small-avatar"
+                            style={{
+                              background: isUserMaster ? '#7c3aed' : u.active ? '#3b82f6' : '#94a3b8',
+                              color: '#fff',
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                            }}
+                          >
                             {initials}
                           </span>
                           <div>
@@ -4093,45 +4858,72 @@ function AdminUsersManager({ token }: { token: string }) {
                           </div>
                         </div>
                       </td>
-                      <td style={{ padding: '12px', maxWidth: 420 }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {(u.permissions || []).map((perm) => (
-                            <span
-                              key={perm}
-                              style={{
-                                display: 'inline-block',
-                                padding: '2px 8px',
-                                borderRadius: 12,
-                                background: '#f1f5f9',
-                                color: '#334155',
-                                fontSize: '0.73rem',
-                                fontWeight: 600,
-                                border: '1px solid #e2e8f0',
-                                textTransform: 'capitalize',
-                              }}
-                            >
-                              {perm}
+
+                      <td style={{ padding: '12px' }}>
+                        {isUserMaster ? (
+                          <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontWeight: 800 }}>MASTER ADMIN</span>
+                        ) : u.role === 'ENTITY_ADMIN' ? (
+                          <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', fontWeight: 800 }}>ENTITY ADMIN</span>
+                        ) : u.role === 'DISPATCH_MANAGER' ? (
+                          <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontWeight: 700 }}>DISPATCHER</span>
+                        ) : (
+                          <span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontWeight: 700 }}>STAFF</span>
+                        )}
+                      </td>
+
+                      {isMaster && (
+                        <td style={{ padding: '12px' }}>
+                          {isUserMaster ? (
+                            <span style={{ fontSize: '0.8rem', color: '#7c3aed', fontWeight: 600 }}>Platform Global</span>
+                          ) : (
+                            <span className="badge" style={{ background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', fontWeight: 600 }}>
+                              🏢 {matchedEntity?.name || u.entityId || 'DJ Cabs'}
                             </span>
-                          ))}
-                          {(!u.permissions || u.permissions.length === 0) && (
-                            <span style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 600 }}>No permissions assigned</span>
+                          )}
+                        </td>
+                      )}
+
+                      <td style={{ padding: '12px', maxWidth: 320 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {isUserMaster ? (
+                            <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.72rem', fontWeight: 700 }}>
+                              ALL PERMISSIONS GRANTED
+                            </span>
+                          ) : (
+                            (u.permissions || []).map((perm) => (
+                              <span
+                                key={perm}
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '1px 7px',
+                                  borderRadius: 10,
+                                  background: '#f1f5f9',
+                                  color: '#334155',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  border: '1px solid #e2e8f0',
+                                  textTransform: 'capitalize',
+                                }}
+                              >
+                                {perm}
+                              </span>
+                            ))
                           )}
                         </div>
                       </td>
+
                       <td style={{ padding: '12px' }}>
                         {u.active ? (
-                          <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontSize: '0.75rem', fontWeight: 700 }}>
+                          <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontSize: '0.72rem', fontWeight: 700 }}>
                             ACTIVE
                           </span>
                         ) : (
-                          <span className="badge" style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>
+                          <span className="badge" style={{ background: '#fee2e2', color: '#991b1b', fontSize: '0.72rem', fontWeight: 700 }}>
                             DEACTIVATED
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '0.8rem', color: '#64748b' }}>
-                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
-                      </td>
+
                       <td style={{ padding: '12px', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                           <button
@@ -4179,13 +4971,13 @@ function AdminUsersManager({ token }: { token: string }) {
         )}
       </div>
 
-      {/* Create / Edit Sub-Admin Modal */}
+      {/* Create / Edit User Modal */}
       {modalOpen && (
         <Modal
-          title={editingUser ? `Edit Administrator: ${editingUser.name}` : 'Create New Administrator'}
+          title={editingUser ? `Edit Account: ${editingUser.name}` : (isMaster ? 'Create Administrator or Staff' : `Add Staff for ${entityName}`)}
           onClose={() => !busy && setModalOpen(false)}
         >
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {error && <ErrorBox message={error} />}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -4198,7 +4990,7 @@ function AdminUsersManager({ token }: { token: string }) {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Dispatcher Ramesh"
+                  placeholder="e.g. Ramesh Kumar"
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
                 />
               </div>
@@ -4215,6 +5007,53 @@ function AdminUsersManager({ token }: { token: string }) {
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
                 />
               </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isMaster ? '1fr 1fr' : '1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                  System Role *
+                </label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as AdminRole)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                >
+                  {isMaster ? (
+                    <>
+                      <option value="ENTITY_ADMIN">Entity Admin (Company Owner)</option>
+                      <option value="DISPATCH_MANAGER">Dispatch Manager</option>
+                      <option value="SUB_ADMIN">Sub-Admin (Custom Modules)</option>
+                      <option value="MASTER_ADMIN">Master Admin (Global Platform)</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="DISPATCH_MANAGER">Dispatch Manager</option>
+                      <option value="OPERATIONS">Operations Staff</option>
+                      <option value="SUB_ADMIN">Sub-Admin</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {isMaster && role !== 'MASTER_ADMIN' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                    Assign to Company *
+                  </label>
+                  <select
+                    value={targetEntityId}
+                    onChange={(e) => setTargetEntityId(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                  >
+                    {entities.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name} ({e.city || e.slug})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div>
@@ -4244,75 +5083,77 @@ function AdminUsersManager({ token }: { token: string }) {
               </label>
             </div>
 
-            {/* Permission Checkboxes */}
-            <div style={{ marginTop: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div>
-                  <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Module Permissions *</strong>
-                  <p className="muted" style={{ fontSize: '0.78rem', margin: '2px 0 0' }}>
-                    Select which modules this administrator can access. Other modules will be strictly hidden and blocked.
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    className="secondary small"
-                    onClick={selectAllPermissions}
-                    style={{ fontSize: '0.72rem', padding: '2px 8px' }}
-                  >
-                    Select All
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary small"
-                    onClick={clearAllPermissions}
-                    style={{ fontSize: '0.72rem', padding: '2px 8px' }}
-                  >
-                    Clear All
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
-                {AVAILABLE_PERMISSIONS.map((perm) => {
-                  const isChecked = permissions.includes(perm.id);
-                  const Icon = perm.icon;
-                  return (
-                    <div
-                      key={perm.id}
-                      onClick={() => togglePermission(perm.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 10,
-                        padding: '10px 12px',
-                        borderRadius: 8,
-                        border: isChecked ? '1px solid #3b82f6' : '1px solid #e2e8f0',
-                        background: isChecked ? '#eff6ff' : '#ffffff',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
+            {/* Permission Checkboxes (hidden if role is MASTER_ADMIN) */}
+            {role !== 'MASTER_ADMIN' && (
+              <div style={{ marginTop: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div>
+                    <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Module Permissions *</strong>
+                    <p className="muted" style={{ fontSize: '0.78rem', margin: '2px 0 0' }}>
+                      Select which modules this user can access within their assigned company.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      onClick={selectAllPermissions}
+                      style={{ fontSize: '0.72rem', padding: '2px 8px' }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {}}
-                        style={{ marginTop: 2, cursor: 'pointer' }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.82rem', color: isChecked ? '#1d4ed8' : '#1e293b' }}>
-                          <Icon size={14} />
-                          {perm.label}
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      onClick={clearAllPermissions}
+                      style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
+                  {AVAILABLE_PERMISSIONS.map((perm) => {
+                    const isChecked = permissions.includes(perm.id);
+                    const Icon = perm.icon;
+                    return (
+                      <div
+                        key={perm.id}
+                        onClick={() => togglePermission(perm.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 10,
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          border: isChecked ? '1px solid #3b82f6' : '1px solid #e2e8f0',
+                          background: isChecked ? '#eff6ff' : '#ffffff',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          style={{ marginTop: 2, cursor: 'pointer' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.82rem', color: isChecked ? '#1d4ed8' : '#1e293b' }}>
+                            <Icon size={14} />
+                            {perm.label}
+                          </div>
+                          <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: isChecked ? '#3b82f6' : '#64748b', lineHeight: 1.3 }}>
+                            {perm.description}
+                          </p>
                         </div>
-                        <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: isChecked ? '#3b82f6' : '#64748b', lineHeight: 1.3 }}>
-                          {perm.description}
-                        </p>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
               <button
@@ -4330,7 +5171,7 @@ function AdminUsersManager({ token }: { token: string }) {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
                 {busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}
-                {editingUser ? 'Update Administrator' : 'Create Administrator'}
+                {editingUser ? 'Update Account' : 'Create Account'}
               </button>
             </div>
           </form>

@@ -17,6 +17,7 @@ import type {
   AdminPermission,
   AdminRole,
   AdminUser,
+  Entity,
 } from '../../shared-types/src/index';
 
 export const API_PREFIX = '/api/v1';
@@ -110,6 +111,13 @@ export interface AdminAuthResponse {
     email: string;
     role: AdminRole;
     permissions: AdminPermission[];
+    entityId?: string;
+  };
+  entity?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
   };
 }
 
@@ -120,8 +128,36 @@ export interface AdminUserSummary {
   role: AdminRole;
   permissions: AdminPermission[];
   active: boolean;
+  entityId?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface EntitySummary {
+  id: string;
+  name: string;
+  slug: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  city?: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  vehicleCount: number;
+  driverCount: number;
+  bookingCount: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PublicEntityInfo {
+  id: string;
+  name: string;
+  slug: string;
+  contactPhone?: string;
+  city?: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  directVehicleBooking?: boolean;
+  businessName?: string;
 }
 
 export interface AdminDashboardResponse {

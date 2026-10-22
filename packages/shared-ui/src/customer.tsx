@@ -77,6 +77,8 @@ export default function CustomerApp() {
   const [auth, setAuth] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [success, setSuccess] = useState(false);
+  const [entitySlug, setEntitySlug] = useState<string>('');
+  const [entityInfo, setEntityInfo] = useState<{ id: string; name: string; slug: string; city?: string; contactPhone?: string } | null>(null);
   const config = useResource<{ settings: Settings; routes: Route[]; mockMode: boolean }>('/public/config');
 
   useEffect(() => {
@@ -84,6 +86,17 @@ export default function CustomerApp() {
       const path = window.location.pathname;
       if (path === '/download') setPage('download');
       else if (path === '/track') setPage('track');
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const ent = (urlParams.get('entity') || '').trim();
+      if (ent) {
+        setEntitySlug(ent);
+        api<{ id: string; name: string; slug: string; city?: string; contactPhone?: string }>(`/customer/entity/${ent}`)
+          .then((info) => {
+            if (info?.id) setEntityInfo(info);
+          })
+          .catch(() => {});
+      }
     }
   }, []);
 
@@ -226,6 +239,21 @@ export default function CustomerApp() {
             </section>
 
             <section id="book" className="booking-panel">
+              {entityInfo && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="badge" style={{ background: '#2563eb', color: '#fff', fontWeight: 800 }}>OPERATOR</span>
+                    <strong style={{ color: '#1e40af', fontSize: '0.98rem' }}>{entityInfo.name}</strong>
+                    {entityInfo.city && <span style={{ color: '#64748b', fontSize: '0.85rem' }}>• {entityInfo.city}</span>}
+                  </div>
+                  {entityInfo.contactPhone && (
+                    <a href={`tel:${entityInfo.contactPhone}`} style={{ color: '#1d4ed8', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>
+                      📞 {entityInfo.contactPhone}
+                    </a>
+                  )}
+                </div>
+              )}
+
               <div className="tab-switcher">
                 <button className={activeTab === 'book' ? 'active' : ''} onClick={() => setActiveTab('book')}>
                   <Car size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} /> Book a new journey
@@ -241,6 +269,7 @@ export default function CustomerApp() {
                   onLogin={() => setAuth(true)}
                   onLoginToken={session.login}
                   routes={config.data?.routes || []}
+                  entitySlug={entitySlug}
                   onBooked={(b) => {
                     setSelectedId(b.id);
                     setSuccess(true);
@@ -501,12 +530,14 @@ function BookingWizard({
   onLoginToken,
   routes,
   onBooked,
+  entitySlug,
 }: {
   token: string;
   onLogin: () => void;
   onLoginToken: (token: string) => void;
   routes: Route[];
   onBooked: (b: Booking) => void;
+  entitySlug?: string;
 }) {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const [search, setSearch] = useState<Search>({
@@ -617,6 +648,7 @@ function BookingWizard({
     try {
       if (searchMode === 'pickup') {
         const params = new URLSearchParams({ pickup: search.pickup, pickupPlaceId: search.pickupPlaceId || '', date: search.date, time: search.time });
+        if (entitySlug) params.set('entity', entitySlug);
         const result = await api<{ vehicles: Quote[]; directVehicleBooking: boolean }>(`/customer/vehicles/by-pickup?${params.toString()}`);
         setQuotes(result.vehicles);
         setDirectBooking(result.directVehicleBooking);
@@ -636,6 +668,7 @@ function BookingWizard({
         time: search.time,
         tripType: search.tripType,
       });
+      if (entitySlug) params.set('entity', entitySlug);
       if (search.tripType === 'ROUND_TRIP' && search.returnDate) params.set('returnDate', search.returnDate);
       if (search.tripType === 'MULTI_CITY') {
         const validStops = search.stops.map((s) => s.trim()).filter(Boolean);
