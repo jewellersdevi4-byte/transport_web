@@ -14,6 +14,9 @@ import type {
   VehicleFeedback,
   VehicleFeedbackSummary,
   FeedbackStatus,
+  AdminPermission,
+  AdminRole,
+  AdminUser,
 } from '../../shared-types/src/index';
 
 export const API_PREFIX = '/api/v1';
@@ -101,6 +104,24 @@ export interface CustomerAuthResponse {
 
 export interface AdminAuthResponse {
   token: string;
+  admin?: {
+    id: string;
+    name: string;
+    email: string;
+    role: AdminRole;
+    permissions: AdminPermission[];
+  };
+}
+
+export interface AdminUserSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: AdminRole;
+  permissions: AdminPermission[];
+  active: boolean;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface AdminDashboardResponse {

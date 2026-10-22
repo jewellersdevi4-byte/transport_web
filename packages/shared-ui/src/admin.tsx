@@ -38,9 +38,14 @@ import {
   Star,
   MapPin,
   Trash2,
+  ShieldCheck,
+  ShieldAlert,
+  UserPlus,
+  Pencil,
+  Lock,
 } from 'lucide-react';
-import type { Booking, Driver, Vehicle, VehiclePackage, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession, VehicleFeedback } from '../../shared-types/src/index';
-import type { AdminFeedbackListResponse } from '../../api-contracts/src/index';
+import type { Booking, Driver, Vehicle, VehiclePackage, Pricing, Route, Notice, Settings, Customer, Store, WhatsAppSession, VehicleFeedback, AdminPermission, AdminRole, AdminUser } from '../../shared-types/src/index';
+import type { AdminFeedbackListResponse, AdminUserSummary } from '../../api-contracts/src/index';
 import { LocationInput } from './location-input';
 import { transitions } from '../../shared-utils/src/index';
 import {
@@ -60,18 +65,18 @@ import {
   type DetailBooking
 } from './common';
 
-const navigation = [
-  ['Dashboard', LayoutDashboard],
-  ['Bookings', CalendarDays],
-  ['Fleet', Car],
-  ['Routes', RouteIcon],
-  ['Reviews', Star],
-  ['Pricing', Tag],
-  ['Reports', ChartNoAxesCombined],
-  ['WhatsApp', MessageSquare],
-  ['Notifications', Bell],
-  ['Settings', SettingsIcon],
-] as const;
+const ALL_ADMIN_MODULES = [
+  ['Dashboard', LayoutDashboard, 'dashboard'] as const,
+  ['Bookings', CalendarDays, 'bookings'] as const,
+  ['Fleet', Car, 'fleet'] as const,
+  ['Routes', RouteIcon, 'routes'] as const,
+  ['Reviews', Star, 'reviews'] as const,
+  ['Pricing', Tag, 'pricing'] as const,
+  ['Reports', ChartNoAxesCombined, 'reports'] as const,
+  ['WhatsApp', MessageSquare, 'whatsapp'] as const,
+  ['Notifications', Bell, 'notifications'] as const,
+  ['Settings', SettingsIcon, 'settings'] as const,
+];
 
 export default function AdminApp() {
   const session = useSession('admin');
@@ -79,7 +84,55 @@ export default function AdminApp() {
   const [booking, setBooking] = useState('');
   const [menu, setMenu] = useState(false);
   const [version, setVersion] = useState(0);
-  const pendingFeedback = useResource<AdminFeedbackListResponse>('/admin/feedback?status=PENDING', session.token);
+
+  const adminProfile = useResource<{
+    id: string;
+    name: string;
+    email: string;
+    role: AdminRole;
+    permissions: AdminPermission[];
+  }>('/admin/me', session.token);
+
+  const isMaster =
+    adminProfile.data?.role === 'MASTER_ADMIN' ||
+    adminProfile.data?.role === 'SUPER_ADMIN' ||
+    adminProfile.data?.id === 'master-admin' ||
+    adminProfile.data?.id === 'admin' ||
+    Boolean(adminProfile.data?.permissions?.includes('admins'));
+
+  const userPermissions: AdminPermission[] = isMaster
+    ? [
+        'dashboard',
+        'bookings',
+        'fleet',
+        'routes',
+        'reviews',
+        'pricing',
+        'reports',
+        'whatsapp',
+        'notifications',
+        'settings',
+        'admins',
+      ]
+    : adminProfile.data?.permissions || ['dashboard'];
+
+  const visibleNavigation = [
+    ...ALL_ADMIN_MODULES.filter(([_, __, perm]) => userPermissions.includes(perm)),
+    ...(isMaster ? ([['Admins', Users, 'admins']] as const) : []),
+  ];
+
+  useEffect(() => {
+    if (adminProfile.data && visibleNavigation.length > 0) {
+      if (!visibleNavigation.some(([name]) => name === page)) {
+        setPage(visibleNavigation[0][0]);
+      }
+    }
+  }, [adminProfile.data, visibleNavigation, page]);
+
+  const pendingFeedback = useResource<AdminFeedbackListResponse>(
+    userPermissions.includes('reviews') ? '/admin/feedback?status=PENDING' : '',
+    session.token
+  );
   const pendingCount = pendingFeedback.data?.pendingCount || 0;
 
   if (!session.ready) return <Loading />;
@@ -102,15 +155,24 @@ export default function AdminApp() {
     );
   }
 
+  const userInitials =
+    adminProfile.data?.name
+      ?.split(' ')
+      .map((n) => n[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || (isMaster ? 'MA' : 'AD');
+
   return (
     <div className="admin-shell">
       <aside className={`sidebar ${menu ? 'open' : ''}`}>
-        <a className="brand" href="/admin" onClick={(e) => { e.preventDefault(); setPage('Dashboard'); setBooking(''); }}>
+        <a className="brand" href="/admin" onClick={(e) => { e.preventDefault(); setPage(visibleNavigation[0]?.[0] || 'Dashboard'); setBooking(''); }}>
           <img className="brand-logo sidebar-brand-logo" src="/brand/dj-cabs-logo.png" alt="DJ Cabs" />
         </a>
         <p className="nav-label">WORKSPACE</p>
         <nav>
-          {navigation.map(([name, Icon]) => (
+          {visibleNavigation.map(([name, Icon]) => (
             <button
               className={page === name && !booking ? 'active' : ''}
               key={name}
@@ -123,6 +185,7 @@ export default function AdminApp() {
               <Icon size={18} />
               {name}
               {name === 'Bookings' && <span className="nav-dot" />}
+              {name === 'Admins' && <span className="nav-dot" style={{ background: '#9333ea' }} />}
               {name === 'Reviews' && pendingCount > 0 && (
                 <span className="badge" style={{ marginLeft: 'auto', background: '#f59e0b', color: '#fff', fontSize: '0.72rem', padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>
                   {pendingCount}
@@ -133,11 +196,17 @@ export default function AdminApp() {
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-mark">
-            <span className="badge" style={{ background: '#ecfdf5', color: '#065f46', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} /> System Active
-            </span>
-            <strong>Bengaluru Dispatch Hub</strong>
-            <small>Fleet & Operations Center</small>
+            {isMaster ? (
+              <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#9333ea' }} /> Master Admin
+              </span>
+            ) : (
+              <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6' }} /> Sub-Admin
+              </span>
+            )}
+            <strong>{adminProfile.data?.name || (isMaster ? 'Bengaluru Dispatch Hub' : 'Sub-Admin Workspace')}</strong>
+            <small>{adminProfile.data?.email || (isMaster ? 'Central Platform Authority' : 'Restricted Entity')}</small>
           </div>
           <a
             href="/downloads/admin-app-latest.apk"
@@ -177,15 +246,19 @@ export default function AdminApp() {
           </span>
 
           <div className="header-right">
-            <span className="badge" style={{ background: '#ecfdf5', color: '#065f46', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} /> Live Operations
+            <span className="badge" style={{ background: isMaster ? '#f3e8ff' : '#eff6ff', color: isMaster ? '#6b21a8' : '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: isMaster ? '#9333ea' : '#3b82f6' }} />
+              {isMaster ? 'Master Authority' : 'Sub-Admin Workspace'}
             </span>
             <button className="icon-button" aria-label="Notifications" onClick={() => setPage('Notifications')}>
               <Bell size={18} />
             </button>
-            <span className="avatar small-avatar">OP</span>
+            <span className="avatar small-avatar" style={{ background: isMaster ? '#7c3aed' : '#3b82f6', color: '#fff', fontWeight: 700 }}>
+              {userInitials}
+            </span>
             <span className="desktop">
-              Operations Lead<small>Bengaluru Dispatch</small>
+              {adminProfile.data?.name || (isMaster ? 'Master Admin' : 'Sub-Admin')}
+              <small>{isMaster ? 'Root Administrator' : `${visibleNavigation.length} modules granted`}</small>
             </span>
           </div>
         </header>
@@ -218,6 +291,21 @@ export default function AdminApp() {
             <WhatsAppGatewayPage token={session.token} />
           ) : page === 'Notifications' ? (
             <Notifications token={session.token} />
+          ) : page === 'Admins' ? (
+            isMaster ? (
+              <AdminUsersManager token={session.token} />
+            ) : (
+              <div className="card" style={{ padding: 48, textAlign: 'center', maxWidth: 540, margin: '40px auto' }}>
+                <ShieldAlert size={48} color="#ef4444" style={{ margin: '0 auto 16px' }} />
+                <h2>Access Restricted</h2>
+                <p className="muted" style={{ marginBottom: 20 }}>
+                  Administrator management is restricted to the Master Admin. Sub-admins operate as isolated entities and cannot view or manage other administrators.
+                </p>
+                <button className="primary" onClick={() => setPage(visibleNavigation[0]?.[0] || 'Dashboard')}>
+                  Go to Permitted Modules
+                </button>
+              </div>
+            )
           ) : (
             <SettingsPage token={session.token} />
           )}
@@ -3662,6 +3750,592 @@ function WhatsAppGatewayPage({ token }: { token: string }) {
           </div>
         )}
       </section>
+    </>
+  );
+}
+
+const AVAILABLE_PERMISSIONS: { id: AdminPermission; label: string; description: string; icon: any }[] = [
+  { id: 'dashboard', label: 'Dashboard & Metrics', description: 'Overview metrics, charts & system analytics', icon: LayoutDashboard },
+  { id: 'bookings', label: 'Bookings & Dispatch', description: 'Manage bookings, assign chauffeurs & track journeys', icon: CalendarDays },
+  { id: 'fleet', label: 'Fleet & Chauffeurs', description: 'Vehicles, chauffeurs, capacity & packages', icon: Car },
+  { id: 'routes', label: 'Routes & Fixed Fares', description: 'Popular outstation routes & fixed pricing', icon: RouteIcon },
+  { id: 'reviews', label: 'Customer Reviews', description: 'Review moderation, approvals & ratings', icon: Star },
+  { id: 'pricing', label: 'Rate Cards & Pricing', description: 'Vehicle per-km rates, base fares & surge multiplier', icon: Tag },
+  { id: 'reports', label: 'Analytics & Reports', description: 'Business revenue, booking logs & performance data', icon: ChartNoAxesCombined },
+  { id: 'whatsapp', label: 'WhatsApp Gateway', description: 'Live WhatsApp pairing, QR scan & messaging logs', icon: MessageSquare },
+  { id: 'notifications', label: 'Notifications & Alerts', description: 'Send outbound push, SMS & WhatsApp notifications', icon: Bell },
+  { id: 'settings', label: 'Business Settings', description: 'Business profile, legal policies & mobile app APK links', icon: SettingsIcon },
+];
+
+function AdminUsersManager({ token }: { token: string }) {
+  const usersResource = useResource<{ users: AdminUserSummary[] }>('/admin/users', token);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<AdminUserSummary | null>(null);
+
+  // Form State
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [active, setActive] = useState(true);
+  const [permissions, setPermissions] = useState<AdminPermission[]>(['dashboard', 'bookings']);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+
+  const openCreateModal = () => {
+    setEditingUser(null);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setActive(true);
+    setPermissions(['dashboard', 'bookings']);
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openEditModal = (user: AdminUserSummary) => {
+    setEditingUser(user);
+    setName(user.name);
+    setEmail(user.email);
+    setPassword('');
+    setActive(user.active);
+    setPermissions(user.permissions || []);
+    setError('');
+    setModalOpen(true);
+  };
+
+  const togglePermission = (perm: AdminPermission) => {
+    setPermissions((prev) =>
+      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
+    );
+  };
+
+  const selectAllPermissions = () => {
+    setPermissions(AVAILABLE_PERMISSIONS.map((p) => p.id));
+  };
+
+  const clearAllPermissions = () => {
+    setPermissions([]);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError('Please provide a full name.');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Please provide a valid email address.');
+      return;
+    }
+    if (!editingUser && (!password || password.length < 6)) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (permissions.length === 0) {
+      setError('Please select at least one permission module for this administrator.');
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      if (editingUser) {
+        await api(`/admin/users/${editingUser.id}`, {
+          token,
+          method: 'PUT',
+          body: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password: password.trim() || undefined,
+            permissions,
+            active,
+          },
+        });
+        setSuccess(`Administrator "${name}" updated successfully.`);
+      } else {
+        await api('/admin/users', {
+          token,
+          method: 'POST',
+          body: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password: password.trim(),
+            permissions,
+            role: 'SUB_ADMIN',
+          },
+        });
+        setSuccess(`Administrator "${name}" created successfully.`);
+      }
+      setModalOpen(false);
+      usersResource.reload();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to save administrator.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleActive = async (user: AdminUserSummary) => {
+    setActionBusyId(user.id);
+    try {
+      await api(`/admin/users/${user.id}`, {
+        token,
+        method: 'PUT',
+        body: { active: !user.active },
+      });
+      usersResource.reload();
+    } catch (err) {
+      alert((err as Error).message || 'Failed to update admin status.');
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
+  const handleDelete = async (user: AdminUserSummary) => {
+    if (!confirm(`Are you sure you want to permanently delete administrator "${user.name}" (${user.email})? This action cannot be undone.`)) {
+      return;
+    }
+    setActionBusyId(user.id);
+    try {
+      await api(`/admin/users/${user.id}`, {
+        token,
+        method: 'DELETE',
+      });
+      usersResource.reload();
+      setSuccess(`Administrator "${user.name}" removed successfully.`);
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      alert((err as Error).message || 'Failed to delete administrator.');
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
+  const allUsers = usersResource.data?.users || [];
+  const activeCount = allUsers.filter((u) => u.active).length;
+  const inactiveCount = allUsers.length - activeCount;
+
+  const filteredUsers = allUsers.filter((u) => {
+    if (statusFilter === 'ACTIVE' && !u.active) return false;
+    if (statusFilter === 'INACTIVE' && u.active) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.permissions || []).some((p) => p.toLowerCase().includes(q))
+    );
+  });
+
+  return (
+    <>
+      <Heading
+        eyebrow="ACCESS CONTROL & ENTITY ISOLATION"
+        title="Administrator Management"
+        description="Master Admin console to create and manage sub-administrators with custom permissions. Each sub-admin operates in an isolated environment without access to other admins."
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={openCreateModal}
+            >
+              <UserPlus size={16} /> Add Administrator
+            </button>
+            <button
+              className="secondary"
+              onClick={() => usersResource.reload()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </div>
+        }
+      />
+
+      {success && (
+        <div className="card" style={{ padding: '12px 16px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 8, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: '0.9rem' }}>
+          <CheckCircle2 size={18} color="#10b981" /> {success}
+        </div>
+      )}
+
+      {usersResource.error && <ErrorBox message={usersResource.error} />}
+
+      {/* Metrics Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 20 }}>
+        <div className="card" style={{ padding: '16px 20px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total System Admins</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', marginTop: 4 }}>
+            {1 + allUsers.length} <span style={{ fontSize: '0.9rem', fontWeight: 500, color: '#64748b' }}>(1 Master + {allUsers.length} Sub)</span>
+          </div>
+        </div>
+        <div className="card" style={{ padding: '16px 20px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Sub-Admins</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#15803d', marginTop: 4 }}>{activeCount} Active</div>
+        </div>
+        <div className="card" style={{ padding: '16px 20px', background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 12 }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6b21a8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Entity Isolation Model</span>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#581c87', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ShieldCheck size={18} color="#7c3aed" /> Strict RBAC Enforcement
+          </div>
+          <small style={{ color: '#7e22ce', fontSize: '0.75rem' }}>Sub-admins cannot view or manage other administrators.</small>
+        </div>
+      </div>
+
+      {/* Master Admin Root Authority Card */}
+      <div className="card" style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #cbd5e1', borderRadius: 12, marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#7c3aed', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <strong style={{ fontSize: '1.05rem', color: '#0f172a' }}>Platform Master Admin</strong>
+                <span className="badge" style={{ background: '#7c3aed', color: '#fff', fontSize: '0.72rem', fontWeight: 800 }}>ROOT AUTHORITY</span>
+                <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontSize: '0.72rem', fontWeight: 700 }}>PERMANENT ACTIVE</span>
+              </div>
+              <p className="muted" style={{ fontSize: '0.84rem', marginTop: 2, marginBottom: 0 }}>
+                Root platform administrator with unrestricted access to all dispatch, fleet, routes, pricing, reports, settings, and administrator assignment modules.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Lock size={14} /> Immutable System Entity
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Sub-Admins List */}
+      <div className="card panel">
+        <div className="section-title" style={{ flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h2>Assigned Sub-Administrators ({allUsers.length})</h2>
+            <p className="muted" style={{ fontSize: '0.84rem' }}>
+              Sub-admins only have access to the modules explicitly checked below. They cannot view other administrators or platform credentials.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name, email, or permission..."
+                style={{ paddingLeft: 32, fontSize: '0.85rem', width: 260, height: 34, borderRadius: 6, border: '1px solid #cbd5e1' }}
+              />
+            </div>
+            <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: 2, borderRadius: 6 }}>
+              {(['ALL', 'ACTIVE', 'INACTIVE'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setStatusFilter(mode)}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: statusFilter === mode ? 700 : 500,
+                    background: statusFilter === mode ? '#ffffff' : 'transparent',
+                    color: statusFilter === mode ? '#0f172a' : '#64748b',
+                    borderRadius: 4,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: statusFilter === mode ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  }}
+                >
+                  {mode === 'ALL' ? `All (${allUsers.length})` : mode === 'ACTIVE' ? `Active (${activeCount})` : `Inactive (${inactiveCount})`}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {filteredUsers.length === 0 ? (
+          <Empty title={allUsers.length === 0 ? 'No sub-administrators created yet' : 'No matching sub-administrators found'}>
+            {allUsers.length === 0
+              ? 'Click "+ Add Administrator" above to create an isolated administrator account with custom permissions.'
+              : 'Try clearing your search query or status filter.'}
+          </Empty>
+        ) : (
+          <div className="table-scroll">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left', fontSize: '0.78rem', color: '#64748b' }}>
+                  <th style={{ padding: '10px 12px' }}>ADMINISTRATOR</th>
+                  <th style={{ padding: '10px 12px' }}>ASSIGNED PERMISSIONS</th>
+                  <th style={{ padding: '10px 12px' }}>STATUS</th>
+                  <th style={{ padding: '10px 12px' }}>CREATED</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((u) => {
+                  const isBusy = actionBusyId === u.id;
+                  const initials = u.name.split(' ').map((n) => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'AD';
+                  return (
+                    <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span className="avatar small-avatar" style={{ background: u.active ? '#3b82f6' : '#94a3b8', color: '#fff', fontSize: '0.8rem', fontWeight: 700 }}>
+                            {initials}
+                          </span>
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '0.9rem', color: '#0f172a' }}>{u.name}</strong>
+                            <small style={{ color: '#64748b', fontSize: '0.8rem' }}>{u.email}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px', maxWidth: 420 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {(u.permissions || []).map((perm) => (
+                            <span
+                              key={perm}
+                              style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: 12,
+                                background: '#f1f5f9',
+                                color: '#334155',
+                                fontSize: '0.73rem',
+                                fontWeight: 600,
+                                border: '1px solid #e2e8f0',
+                                textTransform: 'capitalize',
+                              }}
+                            >
+                              {perm}
+                            </span>
+                          ))}
+                          {(!u.permissions || u.permissions.length === 0) && (
+                            <span style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 600 }}>No permissions assigned</span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        {u.active ? (
+                          <span className="badge" style={{ background: '#dcfce7', color: '#166534', fontSize: '0.75rem', fontWeight: 700 }}>
+                            ACTIVE
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>
+                            DEACTIVATED
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px', fontSize: '0.8rem', color: '#64748b' }}>
+                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="secondary small"
+                            onClick={() => openEditModal(u)}
+                            disabled={isBusy}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: '0.78rem' }}
+                          >
+                            <Pencil size={13} /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary small"
+                            onClick={() => handleToggleActive(u)}
+                            disabled={isBusy}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '4px 8px',
+                              fontSize: '0.78rem',
+                              color: u.active ? '#d97706' : '#16a34a',
+                            }}
+                          >
+                            {u.active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary small"
+                            onClick={() => handleDelete(u)}
+                            disabled={isBusy}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: '0.78rem', color: '#dc2626' }}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Create / Edit Sub-Admin Modal */}
+      {modalOpen && (
+        <Modal
+          title={editingUser ? `Edit Administrator: ${editingUser.name}` : 'Create New Administrator'}
+          onClose={() => !busy && setModalOpen(false)}
+        >
+          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {error && <ErrorBox message={error} />}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Dispatcher Ramesh"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="e.g. ramesh@cabs.local"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                {editingUser ? 'New Password (leave blank to keep current)' : 'Account Password *'}
+              </label>
+              <input
+                type="password"
+                required={!editingUser}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={editingUser ? 'Enter new password if changing...' : 'Minimum 6 characters'}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+              <input
+                type="checkbox"
+                id="activeStatus"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              <label htmlFor="activeStatus" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b', cursor: 'pointer' }}>
+                Account Active (uncheck to temporarily deactivate sign-in access)
+              </label>
+            </div>
+
+            {/* Permission Checkboxes */}
+            <div style={{ marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div>
+                  <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Module Permissions *</strong>
+                  <p className="muted" style={{ fontSize: '0.78rem', margin: '2px 0 0' }}>
+                    Select which modules this administrator can access. Other modules will be strictly hidden and blocked.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="secondary small"
+                    onClick={selectAllPermissions}
+                    style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary small"
+                    onClick={clearAllPermissions}
+                    style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+                {AVAILABLE_PERMISSIONS.map((perm) => {
+                  const isChecked = permissions.includes(perm.id);
+                  const Icon = perm.icon;
+                  return (
+                    <div
+                      key={perm.id}
+                      onClick={() => togglePermission(perm.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        border: isChecked ? '1px solid #3b82f6' : '1px solid #e2e8f0',
+                        background: isChecked ? '#eff6ff' : '#ffffff',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {}}
+                        style={{ marginTop: 2, cursor: 'pointer' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.82rem', color: isChecked ? '#1d4ed8' : '#1e293b' }}>
+                          <Icon size={14} />
+                          {perm.label}
+                        </div>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: isChecked ? '#3b82f6' : '#64748b', lineHeight: 1.3 }}>
+                          {perm.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setModalOpen(false)}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary"
+                disabled={busy}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                {busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}
+                {editingUser ? 'Update Administrator' : 'Create Administrator'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </>
   );
 }

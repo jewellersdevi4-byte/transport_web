@@ -53,13 +53,31 @@ export interface EmailOtpRecord {
   code?: string;
 }
 
+export type AdminPermission =
+  | 'dashboard'
+  | 'bookings'
+  | 'fleet'
+  | 'routes'
+  | 'reviews'
+  | 'pricing'
+  | 'reports'
+  | 'whatsapp'
+  | 'notifications'
+  | 'settings'
+  | 'admins';
+
+export type AdminRole = 'MASTER_ADMIN' | 'SUB_ADMIN' | 'SUPER_ADMIN' | 'DISPATCH_MANAGER' | 'OPERATIONS';
+
 export interface AdminUser {
   id: string;
   name: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'DISPATCH_MANAGER' | 'OPERATIONS';
+  role: AdminRole;
+  permissions: AdminPermission[];
   active: boolean;
-  createdAt?: string;
+  passwordHash?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Address {
