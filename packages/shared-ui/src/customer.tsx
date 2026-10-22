@@ -233,7 +233,7 @@ export default function CustomerApp() {
                 </div>
                 <div className="floating-card">
                   <span className="green-dot" /> Karnataka & South India
-                  <small>Bengaluru → Mysuru, Coorg, Ooty, Chikmagalur</small>
+                  <small>Udupi, Mangaluru, Bengaluru, Mysuru, Coorg</small>
                 </div>
               </div>
             </section>
@@ -287,7 +287,7 @@ export default function CustomerApp() {
                   <p className="eyebrow">POPULAR OUTSTATION ESCAPES</p>
                   <h2>Familiar routes. Pure comfort.</h2>
                 </div>
-                <span className="muted">Direct intercity private cabs from Bengaluru</span>
+                <span className="muted">Direct intercity private cabs across Karnataka & South India</span>
               </div>
               <div className="route-cards">
                 {(config.data?.routes || []).map((r, i) => (
@@ -415,7 +415,7 @@ export default function CustomerApp() {
           <div className="page">
             <p className="eyebrow">EXPLORE SOUTH INDIA</p>
             <h1>Popular Outstation Routes</h1>
-            <p className="muted">Transparent, all-inclusive pricing for top destinations from Bengaluru.</p>
+            <p className="muted">Transparent, all-inclusive pricing for top outstation journeys.</p>
             <div className="route-cards" style={{ marginTop: 28 }}>
               {(config.data?.routes || []).map((r, i) => (
                 <div key={r.id} className={`route-card route-${i}`}>
@@ -1517,7 +1517,7 @@ function TrackTripInline({ onOpenBooking }: { onOpenBooking: (id: string) => voi
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: 16, borderRadius: 10, margin: '16px 0' }}>
               <strong style={{ color: '#92400e', display: 'block' }}>Chauffeur Assignment in Progress</strong>
               <small style={{ color: '#b45309' }}>
-                Our 24/7 Bengaluru dispatch team is assigning an experienced driver for your {trip.vehicleType}. You will receive a WhatsApp notification shortly.
+                Our 24/7 dispatch team is assigning an experienced driver for your {trip.vehicleType}. You will receive a WhatsApp notification shortly.
               </small>
             </div>
           )}

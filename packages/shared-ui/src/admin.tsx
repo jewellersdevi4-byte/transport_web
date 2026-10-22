@@ -89,7 +89,6 @@ export default function AdminApp() {
   const [booking, setBooking] = useState('');
   const [menu, setMenu] = useState(false);
   const [version, setVersion] = useState(0);
-  const [selectedEntityId, setSelectedEntityId] = useState<string>('all');
 
   const adminProfile = useResource<{
     id: string;
@@ -112,13 +111,6 @@ export default function AdminApp() {
     adminProfile.data?.id === 'master-admin' ||
     adminProfile.data?.id === 'admin';
 
-  const isEntityAdmin = adminProfile.data?.role === 'ENTITY_ADMIN';
-
-  const entitiesResource = useResource<{ entities: EntitySummary[] }>(
-    isMaster ? '/admin/entities' : '',
-    session.token
-  );
-
   const userPermissions: AdminPermission[] = isMaster
     ? [
         'dashboard',
@@ -132,16 +124,12 @@ export default function AdminApp() {
         'notifications',
         'settings',
         'admins',
-        'entities',
       ]
     : adminProfile.data?.permissions || ['dashboard'];
 
   const visibleNavigation = [
     ...ALL_ADMIN_MODULES.filter(([_, __, perm]) => userPermissions.includes(perm)),
-    ...(isMaster ? ([['Entities', Building2, 'entities']] as const) : []),
-    ...(isMaster
-      ? ([['Admins', Users, 'admins']] as const)
-      : (userPermissions.includes('admins') ? ([['Staff', Users, 'admins']] as const) : [])),
+    ...(isMaster ? ([['Admins', Users, 'admins']] as const) : []),
   ];
 
   useEffect(() => {
@@ -165,12 +153,12 @@ export default function AdminApp() {
         <div className="login-story">
           <div className="brand login-brand">
             <img className="brand-logo" src="/brand/dj-cabs-logo.png" alt="DJ Cabs" />
-            <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', fontWeight: 800 }}>DISPATCH CONSOLE</span>
+            <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', fontWeight: 800 }}>ADMIN CONSOLE</span>
           </div>
-          <p className="eyebrow">CENTRAL OPERATIONS PORTAL</p>
+          <p className="eyebrow">DJ CABS OPERATIONS</p>
           <h1>Real-time fleet.<br />Every mile in control.</h1>
           <p>
-            Central operations management console. Dispatch verified chauffeurs, monitor journeys in real time, and oversee fleet readiness.
+            Central operations management console for DJ Cabs. Dispatch verified chauffeurs, monitor journeys in real time, and oversee fleet readiness.
           </p>
         </div>
         <Auth admin onLogin={session.login} />
@@ -190,10 +178,11 @@ export default function AdminApp() {
   return (
     <div className="admin-shell">
       <aside className={`sidebar ${menu ? 'open' : ''}`}>
-        <a className="brand" href="/admin" onClick={(e) => { e.preventDefault(); setPage(visibleNavigation[0]?.[0] || 'Dashboard'); setBooking(''); }}>
+        <a className="brand" href="/admin" onClick={(e) => { e.preventDefault(); setPage(visibleNavigation[0]?.[0] || 'Dashboard'); setBooking(''); }} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <img className="brand-logo sidebar-brand-logo" src="/brand/dj-cabs-logo.png" alt="DJ Cabs" />
+          <span style={{ fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>Admin DJ Cabs</span>
         </a>
-        <p className="nav-label">WORKSPACE</p>
+        <p className="nav-label">OPERATIONS</p>
         <nav>
           {visibleNavigation.map(([name, Icon]) => (
             <button
@@ -208,9 +197,7 @@ export default function AdminApp() {
               <Icon size={18} />
               {name}
               {name === 'Bookings' && <span className="nav-dot" />}
-              {name === 'Entities' && <span className="nav-dot" style={{ background: '#0284c7' }} />}
-              {name === 'Admins' && <span className="nav-dot" style={{ background: '#9333ea' }} />}
-              {name === 'Staff' && <span className="nav-dot" style={{ background: '#10b981' }} />}
+              {name === 'Admins' && <span className="nav-dot" style={{ background: '#7c3aed' }} />}
               {name === 'Reviews' && pendingCount > 0 && (
                 <span className="badge" style={{ marginLeft: 'auto', background: '#f59e0b', color: '#fff', fontSize: '0.72rem', padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>
                   {pendingCount}
@@ -221,25 +208,16 @@ export default function AdminApp() {
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-mark">
-            {isMaster ? (
-              <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#9333ea' }} /> Platform Master
-              </span>
-            ) : isEntityAdmin ? (
-              <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563eb' }} /> Entity Admin
-              </span>
-            ) : (
-              <span className="badge" style={{ background: '#f1f5f9', color: '#475569', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#64748b' }} /> Staff / Dispatch
-              </span>
-            )}
-            <strong>{adminProfile.data?.name || (isMaster ? 'Platform Provider' : 'Cab Operator Workspace')}</strong>
-            <small>{isMaster ? 'Central Multi-Entity Authority' : (adminProfile.data?.entity?.name || 'Isolated Entity')}</small>
+            <span className="badge" style={{ background: isMaster ? '#f3e8ff' : '#dbeafe', color: isMaster ? '#6b21a8' : '#1e40af', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: isMaster ? '#9333ea' : '#2563eb' }} />
+              {isMaster ? 'Master Admin' : 'Admin'}
+            </span>
+            <strong>{adminProfile.data?.name || (isMaster ? 'Master Admin' : 'DJ Cabs Admin')}</strong>
+            <small>{isMaster ? 'Root Administrator · All Access' : (adminProfile.data?.email || 'Operations')}</small>
           </div>
           <a
             href="/downloads/admin-app-latest.apk"
-            download="dj-cabs-admin-latest.apk"
+            download="admin-dj-cabs-latest.apk"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -271,56 +249,19 @@ export default function AdminApp() {
             <Menu />
           </button>
           <span className="muted">
-            Workspace <span className="breadcrumb">/</span> <strong>{booking ? 'Booking Details' : page}</strong>
+            Admin DJ Cabs <span className="breadcrumb">/</span> <strong>{booking ? 'Booking Details' : page}</strong>
           </span>
 
           <div className="header-right">
-            {isMaster && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
-                <Building2 size={16} color="#7c3aed" />
-                <select
-                  aria-label="Filter by Entity"
-                  value={selectedEntityId}
-                  onChange={(e) => {
-                    setSelectedEntityId(e.target.value);
-                    setVersion((v) => v + 1);
-                  }}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 8,
-                    border: '1.5px solid #cbd5e1',
-                    background: '#ffffff',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    color: '#1e293b',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value="all">🏢 All Companies (Aggregated)</option>
-                  {(entitiesResource.data?.entities || []).map((ent) => (
-                    <option key={ent.id} value={ent.id}>
-                      {ent.status === 'SUSPENDED' ? '⛔ ' : '🏢 '} {ent.name} ({ent.city || ent.slug})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {!isMaster && (
-              <span className="badge" style={{ background: '#dbeafe', color: '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, padding: '5px 12px', marginRight: 8 }}>
-                🏢 {adminProfile.data?.entity?.name || 'Company Fleet'}
-              </span>
-            )}
-
             <button className="icon-button" aria-label="Notifications" onClick={() => setPage('Notifications')}>
               <Bell size={18} />
             </button>
-            <span className="avatar small-avatar" style={{ background: isMaster ? '#7c3aed' : '#3b82f6', color: '#fff', fontWeight: 700 }}>
+            <span className="avatar small-avatar" style={{ background: isMaster ? '#7c3aed' : '#2563eb', color: '#fff', fontWeight: 700 }}>
               {userInitials}
             </span>
             <span className="desktop">
               {adminProfile.data?.name || (isMaster ? 'Master Admin' : 'Admin')}
-              <small>{isMaster ? 'Root Administrator' : (adminProfile.data?.entity?.name || 'Company Operations')}</small>
+              <small>{isMaster ? 'Master Administrator' : (adminProfile.data?.entity?.name || 'Administrator')}</small>
             </span>
           </div>
         </header>
@@ -340,65 +281,47 @@ export default function AdminApp() {
               token={session.token}
               open={setBooking}
               goBookings={() => setPage('Bookings')}
-              entityId={isMaster ? selectedEntityId : undefined}
             />
           ) : page === 'Bookings' ? (
             <Bookings
               token={session.token}
               open={setBooking}
-              entityId={isMaster ? selectedEntityId : undefined}
             />
           ) : page === 'Fleet' || page === 'Drivers' || page === 'Vehicles' ? (
             <Fleet
               token={session.token}
-              entityId={isMaster ? selectedEntityId : undefined}
             />
           ) : page === 'Routes' ? (
             <RoutesPage
               token={session.token}
-              entityId={isMaster ? selectedEntityId : undefined}
             />
           ) : page === 'Reviews' ? (
             <ReviewsPage
               token={session.token}
               onStatusChange={() => pendingFeedback.reload()}
-              entityId={isMaster ? selectedEntityId : undefined}
             />
           ) : page === 'Pricing' ? (
             <PricingPage
               token={session.token}
-              entityId={isMaster ? selectedEntityId : undefined}
             />
           ) : page === 'Reports' ? (
             <Reports
               token={session.token}
-              entityId={isMaster ? selectedEntityId : undefined}
             />
           ) : page === 'WhatsApp' ? (
             <WhatsAppGatewayPage token={session.token} />
           ) : page === 'Notifications' ? (
             <Notifications token={session.token} />
-          ) : page === 'Entities' && isMaster ? (
-            <EntitiesManager
-              token={session.token}
-              onSelectEntity={(slug) => {
-                setSelectedEntityId(slug);
-                setPage('Dashboard');
-              }}
-            />
-          ) : page === 'Admins' || page === 'Staff' ? (
+          ) : page === 'Admins' && isMaster ? (
             <AdminUsersManager
               token={session.token}
               isMaster={isMaster}
               currentEntityId={adminProfile.data?.entityId || 'dj-cabs'}
-              entityName={adminProfile.data?.entity?.name || 'DJ Cabs'}
-              entities={entitiesResource.data?.entities || []}
-              selectedEntityFilter={isMaster ? selectedEntityId : undefined}
+              entityName="DJ Cabs"
             />
           ) : (
             <SettingsPage
               token={session.token}
-              entityId={isMaster ? selectedEntityId : undefined}
             />
           )}
         </main>
@@ -4680,13 +4603,9 @@ function AdminUsersManager({
   return (
     <>
       <Heading
-        eyebrow={isMaster ? 'PLATFORM ROLES & ENTITY ACCESS' : 'INTERNAL PERSONNEL'}
-        title={isMaster ? 'Administrators & Personnel' : `${entityName} Staff & Dispatchers`}
-        description={
-          isMaster
-            ? 'Central administration to create Master Admins, assign Entity Admins to partner companies, and delegate dispatch staff.'
-            : `Manage internal dispatchers, operations team, and booking staff for ${entityName}.`
-        }
+        eyebrow="MASTER ADMIN CONSOLE"
+        title="Admin Management & Access Control"
+        description="Master Admin console to create administrators, set login passwords, specify company names, and assign access permissions to specific operations."
         action={
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -4694,7 +4613,7 @@ function AdminUsersManager({
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               onClick={openCreateModal}
             >
-              <UserPlus size={16} /> {isMaster ? 'Add Administrator' : 'Add Staff Member'}
+              <UserPlus size={16} /> Create Admin
             </button>
             <button
               className="secondary"
@@ -5039,19 +4958,16 @@ function AdminUsersManager({
               {isMaster && role !== 'MASTER_ADMIN' && (
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
-                    Assign to Company *
+                    Company / Entity *
                   </label>
-                  <select
+                  <input
+                    type="text"
+                    required
                     value={targetEntityId}
                     onChange={(e) => setTargetEntityId(e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
-                  >
-                    {entities.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name} ({e.city || e.slug})
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="e.g. DJ Cabs or Star Cabs"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+                  />
                 </div>
               )}
             </div>

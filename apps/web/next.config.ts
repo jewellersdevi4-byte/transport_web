@@ -17,7 +17,11 @@ const config: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.API_INTERNAL_URL || LIVE_BACKEND_URL}/:path*`,
+        destination: `${process.env.API_INTERNAL_URL || LIVE_BACKEND_URL}/api/:path*`,
+      },
+      {
+        source: '/auth/:path*',
+        destination: `${process.env.API_INTERNAL_URL || LIVE_BACKEND_URL}/auth/:path*`,
       },
     ];
   },
