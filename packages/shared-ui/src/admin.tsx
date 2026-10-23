@@ -91,11 +91,19 @@ export default function AdminApp() {
   const [version, setVersion] = useState(0);
 
   const adminProfile = useResource<{
-    id: string;
-    name: string;
-    email: string;
-    role: AdminRole;
-    permissions: AdminPermission[];
+    admin?: {
+      id: string;
+      name: string;
+      email: string;
+      role: AdminRole;
+      permissions: AdminPermission[];
+      entityId?: string;
+    };
+    id?: string;
+    name?: string;
+    email?: string;
+    role?: AdminRole;
+    permissions?: AdminPermission[];
     entityId?: string;
     entity?: {
       id: string;
@@ -105,11 +113,15 @@ export default function AdminApp() {
     };
   }>('/admin/me', session.token);
 
+  const currentAdmin = (adminProfile.data as any)?.admin || adminProfile.data;
+  const currentEntity = (adminProfile.data as any)?.entity || (adminProfile.data as any)?.admin?.entity;
+
   const isMaster =
-    adminProfile.data?.role === 'MASTER_ADMIN' ||
-    adminProfile.data?.role === 'SUPER_ADMIN' ||
-    adminProfile.data?.id === 'master-admin' ||
-    adminProfile.data?.id === 'admin';
+    currentAdmin?.role === 'MASTER_ADMIN' ||
+    currentAdmin?.role === 'SUPER_ADMIN' ||
+    currentAdmin?.id === 'master-admin' ||
+    currentAdmin?.id === 'master-admin-root' ||
+    currentAdmin?.id === 'admin';
 
   const userPermissions: AdminPermission[] = isMaster
     ? [
@@ -125,7 +137,18 @@ export default function AdminApp() {
         'settings',
         'admins',
       ]
-    : adminProfile.data?.permissions || ['dashboard'];
+    : currentAdmin?.permissions || [
+        'dashboard',
+        'bookings',
+        'fleet',
+        'routes',
+        'reviews',
+        'pricing',
+        'reports',
+        'whatsapp',
+        'notifications',
+        'settings',
+      ];
 
   const visibleNavigation = [
     ...ALL_ADMIN_MODULES.filter(([_, __, perm]) => userPermissions.includes(perm)),
@@ -167,9 +190,9 @@ export default function AdminApp() {
   }
 
   const userInitials =
-    adminProfile.data?.name
+    currentAdmin?.name
       ?.split(' ')
-      .map((n) => n[0])
+      .map((n: string) => n[0])
       .filter(Boolean)
       .slice(0, 2)
       .join('')
@@ -212,8 +235,8 @@ export default function AdminApp() {
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: isMaster ? '#9333ea' : '#2563eb' }} />
               {isMaster ? 'Master Admin' : 'Admin'}
             </span>
-            <strong>{adminProfile.data?.name || (isMaster ? 'Master Admin' : 'DJ Cabs Admin')}</strong>
-            <small>{isMaster ? 'Root Administrator · All Access' : (adminProfile.data?.email || 'Operations')}</small>
+            <strong>{currentAdmin?.name || (isMaster ? 'Master Admin' : 'DJ Cabs Admin')}</strong>
+            <small>{isMaster ? 'Root Administrator · All Access' : (currentAdmin?.email || 'Operations')}</small>
           </div>
           <a
             href="/downloads/admin-app-latest.apk"
@@ -260,8 +283,8 @@ export default function AdminApp() {
               {userInitials}
             </span>
             <span className="desktop">
-              {adminProfile.data?.name || (isMaster ? 'Master Admin' : 'Admin')}
-              <small>{isMaster ? 'Master Administrator' : (adminProfile.data?.entity?.name || 'Administrator')}</small>
+              {currentAdmin?.name || (isMaster ? 'Master Admin' : 'Admin')}
+              <small>{isMaster ? 'Master Administrator' : (currentEntity?.name || 'Administrator')}</small>
             </span>
           </div>
         </header>
@@ -316,7 +339,7 @@ export default function AdminApp() {
             <AdminUsersManager
               token={session.token}
               isMaster={isMaster}
-              currentEntityId={adminProfile.data?.entityId || 'dj-cabs'}
+              currentEntityId={currentAdmin?.entityId || 'dj-cabs'}
               entityName="DJ Cabs"
             />
           ) : (
