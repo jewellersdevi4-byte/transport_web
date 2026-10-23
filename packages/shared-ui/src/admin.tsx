@@ -135,6 +135,7 @@ export default function AdminApp() {
         'whatsapp',
         'notifications',
         'settings',
+        'entities',
         'admins',
       ]
     : currentAdmin?.permissions || [
@@ -152,7 +153,14 @@ export default function AdminApp() {
 
   const visibleNavigation = [
     ...ALL_ADMIN_MODULES.filter(([_, __, perm]) => userPermissions.includes(perm)),
-    ...(isMaster ? ([['Admins', Users, 'admins']] as const) : []),
+    ...(isMaster
+      ? ([
+          ['Entities', Building2, 'entities'],
+          ['Admins', Users, 'admins'],
+        ] as const)
+      : userPermissions.includes('admins')
+        ? ([['Admins', Users, 'admins']] as const)
+        : []),
   ];
 
   useEffect(() => {
@@ -335,12 +343,20 @@ export default function AdminApp() {
             <WhatsAppGatewayPage token={session.token} />
           ) : page === 'Notifications' ? (
             <Notifications token={session.token} />
-          ) : page === 'Admins' && isMaster ? (
+          ) : page === 'Entities' && isMaster ? (
+            <EntitiesManager
+              token={session.token}
+              onSelectEntity={(slug) => {
+                setPage('Admins');
+              }}
+            />
+          ) : page === 'Admins' && (isMaster || userPermissions.includes('admins')) ? (
             <AdminUsersManager
               token={session.token}
               isMaster={isMaster}
               currentEntityId={currentAdmin?.entityId || 'dj-cabs'}
-              entityName="DJ Cabs"
+              entityName={currentEntity?.name || 'DJ Cabs'}
+              onOpenEntities={() => setPage('Entities')}
             />
           ) : (
             <SettingsPage
@@ -4357,27 +4373,27 @@ function EntitiesManager({
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 10, background: '#faf5ff', padding: '12px 14px', borderRadius: 8, border: '1px solid #e9d5ff' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <ShieldCheck size={16} color="#7c3aed" />
-                  <strong style={{ fontSize: '0.88rem', color: '#581c87' }}>Initial Entity Admin Account (Optional)</strong>
+                  <strong style={{ fontSize: '0.88rem', color: '#581c87' }}>Entity Admin Sign-In Credentials</strong>
                 </div>
                 <p className="muted" style={{ fontSize: '0.78rem', margin: '0 0 10px 0' }}>
-                  Auto-create credentials for this company's owner/administrator. They can sign in immediately to manage their fleet.
+                  Create the administrator account for this company. The Entity Admin will use these credentials to sign in and manage their fleet.
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
-                      Admin Email
+                      Admin Login Email *
                     </label>
                     <input
                       type="email"
                       value={adminEmail}
                       onChange={(e) => setAdminEmail(e.target.value)}
-                      placeholder="admin@starcabs.local"
+                      placeholder="admin@starcabs.com"
                       style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
                     />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
-                      Admin Password
+                      Admin Password *
                     </label>
                     <input
                       type="password"
@@ -4436,8 +4452,9 @@ function AdminUsersManager({
   isMaster = false,
   currentEntityId = 'dj-cabs',
   entityName = 'DJ Cabs',
-  entities = [],
+  entities: propEntities = [],
   selectedEntityFilter,
+  onOpenEntities,
 }: {
   token: string;
   isMaster?: boolean;
@@ -4445,42 +4462,93 @@ function AdminUsersManager({
   entityName?: string;
   entities?: EntitySummary[];
   selectedEntityFilter?: string;
+  onOpenEntities?: () => void;
 }) {
   const [entityFilter, setEntityFilter] = useState(selectedEntityFilter || 'all');
   const query = isMaster && entityFilter && entityFilter !== 'all' ? `?entityId=${encodeURIComponent(entityFilter)}` : '';
   const usersResource = useResource<{ users: AdminUserSummary[] }>(`/admin/users${query}`, token);
+  const internalEntities = useResource<{ entities: EntitySummary[] }>(isMaster ? '/admin/entities' : '', token);
+  const entities = propEntities && propEntities.length > 0 ? propEntities : (internalEntities.data?.entities || []);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<'ENTITY_ADMIN' | 'STAFF' | 'EDIT'>('ENTITY_ADMIN');
   const [editingUser, setEditingUser] = useState<AdminUserSummary | null>(null);
 
   // Form State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<AdminRole>('SUB_ADMIN');
+  const [role, setRole] = useState<AdminRole>('ENTITY_ADMIN');
   const [targetEntityId, setTargetEntityId] = useState<string>(currentEntityId);
+  const [companyName, setCompanyName] = useState('');
+  const [companyCity, setCompanyCity] = useState('Kaup, Udupi');
+  const [companyPhone, setCompanyPhone] = useState('+91 ');
+  const [companyEmail, setCompanyEmail] = useState('');
   const [active, setActive] = useState(true);
-  const [permissions, setPermissions] = useState<AdminPermission[]>(['dashboard', 'bookings']);
+  const [permissions, setPermissions] = useState<AdminPermission[]>([
+    'dashboard',
+    'bookings',
+    'fleet',
+    'routes',
+    'reviews',
+    'pricing',
+    'reports',
+    'whatsapp',
+    'notifications',
+    'settings',
+  ]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
 
-  const openCreateModal = () => {
+  const openCreateEntityAdminModal = () => {
+    setModalType('ENTITY_ADMIN');
     setEditingUser(null);
     setName('');
     setEmail('');
     setPassword('');
-    setRole(isMaster ? 'ENTITY_ADMIN' : 'DISPATCH_MANAGER');
-    setTargetEntityId(isMaster ? (entities[0]?.id || currentEntityId) : currentEntityId);
+    setCompanyName('');
+    setCompanyCity('Kaup, Udupi');
+    setCompanyPhone('+91 ');
+    setCompanyEmail('');
+    setRole('ENTITY_ADMIN');
+    setTargetEntityId('');
     setActive(true);
-    setPermissions(isMaster ? ['dashboard', 'bookings', 'fleet', 'routes', 'reviews', 'pricing', 'reports', 'settings'] : ['dashboard', 'bookings', 'fleet']);
+    setPermissions([
+      'dashboard',
+      'bookings',
+      'fleet',
+      'routes',
+      'reviews',
+      'pricing',
+      'reports',
+      'whatsapp',
+      'notifications',
+      'settings',
+    ]);
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openCreateStaffModal = () => {
+    setModalType('STAFF');
+    setEditingUser(null);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setRole('DISPATCH_MANAGER');
+    setTargetEntityId(entities[0]?.id || currentEntityId);
+    setActive(true);
+    setPermissions(['dashboard', 'bookings', 'fleet']);
     setError('');
     setModalOpen(true);
   };
 
   const openEditModal = (user: AdminUserSummary) => {
+    setModalType('EDIT');
     setEditingUser(user);
     setName(user.name);
     setEmail(user.email);
@@ -4510,11 +4578,11 @@ function AdminUsersManager({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('Please provide a full name.');
+      setError('Please provide the administrator full name.');
       return;
     }
     if (!email.trim()) {
-      setError('Please provide a valid email address.');
+      setError('Please provide a valid administrator email address.');
       return;
     }
     if (!editingUser && (!password || password.length < 6)) {
@@ -4526,27 +4594,69 @@ function AdminUsersManager({
       return;
     }
 
+    if (modalType === 'ENTITY_ADMIN' && !editingUser) {
+      if (!companyName.trim()) {
+        setError('Please provide the Company / Entity Name.');
+        return;
+      }
+      if (!companyPhone.trim()) {
+        setError('Please provide the Company Contact Phone.');
+        return;
+      }
+    }
+
     setBusy(true);
     setError('');
     try {
-      const payload: any = {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        password: password.trim() || undefined,
-        permissions,
-        active,
-      };
+      if (modalType === 'ENTITY_ADMIN' && !editingUser) {
+        const slug = companyName
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
 
-      if (!editingUser) {
-        payload.role = role;
-        payload.entityId = isMaster ? (role === 'MASTER_ADMIN' ? undefined : targetEntityId) : currentEntityId;
+        await api('/admin/entities', {
+          token,
+          method: 'POST',
+          body: {
+            name: companyName.trim(),
+            slug,
+            city: companyCity.trim() || 'Kaup, Udupi',
+            contactName: name.trim(),
+            contactEmail: companyEmail.trim() || email.trim().toLowerCase(),
+            contactPhone: companyPhone.trim(),
+            adminName: name.trim(),
+            adminEmail: email.trim().toLowerCase(),
+            adminPassword: password.trim(),
+            permissions,
+          },
+        });
+        setSuccess(`Entity Admin "${name}" and company "${companyName}" onboarded successfully.`);
+      } else if (!editingUser) {
+        // Staff creation
         await api('/admin/users', {
           token,
           method: 'POST',
-          body: payload,
+          body: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password: password.trim(),
+            role,
+            entityId: isMaster ? targetEntityId : currentEntityId,
+            permissions,
+            active,
+          },
         });
-        setSuccess(`User "${name}" created successfully.`);
+        setSuccess(`Staff account "${name}" created successfully.`);
       } else {
+        // Editing existing user
+        const payload: any = {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password: password.trim() || undefined,
+          permissions,
+          active,
+        };
         if (isMaster) {
           payload.role = role;
           payload.entityId = role === 'MASTER_ADMIN' ? undefined : targetEntityId;
@@ -4561,6 +4671,7 @@ function AdminUsersManager({
 
       setModalOpen(false);
       usersResource.reload();
+      if (internalEntities.reload) internalEntities.reload();
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
       setError((err as Error).message || 'Failed to save administrator.');
@@ -4628,19 +4739,40 @@ function AdminUsersManager({
       <Heading
         eyebrow="MASTER ADMIN CONSOLE"
         title="Admin Management & Access Control"
-        description="Master Admin console to create administrators, set login passwords, specify company names, and assign access permissions to specific operations."
+        description="Master Admin console to add Entity Admins (company owners) with their company details, assign module permissions, and manage internal staff accounts."
         action={
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {isMaster && (
+              <button
+                className="primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                onClick={openCreateEntityAdminModal}
+              >
+                <Building2 size={16} /> + Add Entity Admin
+              </button>
+            )}
             <button
-              className="primary"
+              className={isMaster ? 'secondary' : 'primary'}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              onClick={openCreateModal}
+              onClick={openCreateStaffModal}
             >
-              <UserPlus size={16} /> Create Admin
+              <UserPlus size={16} /> {isMaster ? '+ Add Staff / Dispatcher' : '+ Add Staff'}
             </button>
+            {isMaster && onOpenEntities && (
+              <button
+                className="secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                onClick={onOpenEntities}
+              >
+                <Building2 size={15} /> All Companies ({entities.length})
+              </button>
+            )}
             <button
               className="secondary"
-              onClick={() => usersResource.reload()}
+              onClick={() => {
+                usersResource.reload();
+                if (internalEntities.reload) internalEntities.reload();
+              }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             >
               <RefreshCw size={15} /> Refresh
@@ -4916,97 +5048,185 @@ function AdminUsersManager({
       {/* Create / Edit User Modal */}
       {modalOpen && (
         <Modal
-          title={editingUser ? `Edit Account: ${editingUser.name}` : (isMaster ? 'Create Administrator or Staff' : `Add Staff for ${entityName}`)}
+          title={
+            editingUser
+              ? `Edit Account: ${editingUser.name}`
+              : modalType === 'ENTITY_ADMIN'
+              ? 'Onboard Entity Admin & Company Details'
+              : `Add Staff / Dispatcher for ${entityName}`
+          }
           onClose={() => !busy && setModalOpen(false)}
         >
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {error && <ErrorBox message={error} />}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Ramesh Kumar"
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-                />
+            {/* ENTITY ADMIN MODE: COMPANY DETAILS SECTION */}
+            {modalType === 'ENTITY_ADMIN' && !editingUser && (
+              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Building2 size={16} color="#0284c7" />
+                  <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>1. Company / Entity Details</strong>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                      Company / Entity Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      placeholder="e.g. Star Cabs or Sri Krishna Travels"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                      Operating City / Region *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={companyCity}
+                      onChange={(e) => setCompanyCity(e.target.value)}
+                      placeholder="e.g. Kaup, Udupi or Bengaluru"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                      Company Contact Phone *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={companyPhone}
+                      onChange={(e) => setCompanyPhone(e.target.value)}
+                      placeholder="e.g. +91 98888 77777"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                      Company Official Email (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      value={companyEmail}
+                      onChange={(e) => setCompanyEmail(e.target.value)}
+                      placeholder="contact@starcabs.com"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. ramesh@cabs.local"
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-                />
-              </div>
-            </div>
+            )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: isMaster ? '1fr 1fr' : '1fr', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
-                  System Role *
-                </label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as AdminRole)}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
-                >
-                  {isMaster ? (
-                    <>
-                      <option value="ENTITY_ADMIN">Entity Admin (Company Owner)</option>
-                      <option value="DISPATCH_MANAGER">Dispatch Manager</option>
-                      <option value="SUB_ADMIN">Sub-Admin (Custom Modules)</option>
-                      <option value="MASTER_ADMIN">Master Admin (Global Platform)</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="DISPATCH_MANAGER">Dispatch Manager</option>
-                      <option value="OPERATIONS">Operations Staff</option>
-                      <option value="SUB_ADMIN">Sub-Admin</option>
-                    </>
-                  )}
-                </select>
-              </div>
+            {/* ADMIN CREDENTIALS SECTION */}
+            <div style={{ background: modalType === 'ENTITY_ADMIN' ? '#faf5ff' : 'transparent', padding: modalType === 'ENTITY_ADMIN' ? '12px 14px' : '0', borderRadius: 8, border: modalType === 'ENTITY_ADMIN' ? '1px solid #e9d5ff' : 'none' }}>
+              {modalType === 'ENTITY_ADMIN' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <ShieldCheck size={16} color="#7c3aed" />
+                  <strong style={{ fontSize: '0.88rem', color: '#581c87' }}>2. Entity Admin Sign-In Credentials</strong>
+                </div>
+              )}
 
-              {isMaster && role !== 'MASTER_ADMIN' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
-                    Company / Entity *
+                    {modalType === 'ENTITY_ADMIN' ? 'Entity Admin Full Name *' : 'Full Name *'}
                   </label>
                   <input
                     type="text"
                     required
-                    value={targetEntityId}
-                    onChange={(e) => setTargetEntityId(e.target.value)}
-                    placeholder="e.g. DJ Cabs or Star Cabs"
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Ramesh Kumar"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
                   />
                 </div>
-              )}
-            </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                    {modalType === 'ENTITY_ADMIN' ? 'Admin Login Email *' : 'Email Address *'}
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. ramesh@starcabs.com"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                  />
+                </div>
+              </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
-                {editingUser ? 'New Password (leave blank to keep current)' : 'Account Password *'}
-              </label>
-              <input
-                type="password"
-                required={!editingUser}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={editingUser ? 'Enter new password if changing...' : 'Minimum 6 characters'}
-                style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1' }}
-              />
+              {/* ROLE & ASSIGNED ENTITY (for STAFF / EDIT mode) */}
+              {modalType !== 'ENTITY_ADMIN' && (
+                <div style={{ display: 'grid', gridTemplateColumns: isMaster ? '1fr 1fr' : '1fr', gap: 12, marginTop: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                      System Role *
+                    </label>
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value as AdminRole)}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                    >
+                      {isMaster ? (
+                        <>
+                          <option value="ENTITY_ADMIN">Entity Admin (Company Owner)</option>
+                          <option value="DISPATCH_MANAGER">Dispatch Manager</option>
+                          <option value="OPERATIONS">Operations Staff</option>
+                          <option value="SUB_ADMIN">Sub-Admin (Custom Modules)</option>
+                          <option value="MASTER_ADMIN">Master Admin (Global Platform)</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="DISPATCH_MANAGER">Dispatch Manager</option>
+                          <option value="OPERATIONS">Operations Staff</option>
+                          <option value="SUB_ADMIN">Sub-Admin</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  {isMaster && role !== 'MASTER_ADMIN' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                        Assigned Company *
+                      </label>
+                      <select
+                        value={targetEntityId}
+                        onChange={(e) => setTargetEntityId(e.target.value)}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                      >
+                        {entities.map((e) => (
+                          <option key={e.id} value={e.id}>
+                            🏢 {e.name} ({e.city || e.slug})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ marginTop: 12 }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4, color: '#334155' }}>
+                  {editingUser ? 'New Password (leave blank to keep current)' : 'Account Login Password *'}
+                </label>
+                <input
+                  type="password"
+                  required={!editingUser}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={editingUser ? 'Enter new password if changing...' : 'Minimum 6 characters'}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff' }}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
@@ -5027,9 +5247,11 @@ function AdminUsersManager({
               <div style={{ marginTop: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div>
-                    <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Module Permissions *</strong>
+                    <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
+                      {modalType === 'ENTITY_ADMIN' ? '3. Operational Module Access *' : 'Module Permissions *'}
+                    </strong>
                     <p className="muted" style={{ fontSize: '0.78rem', margin: '2px 0 0' }}>
-                      Select which modules this user can access within their assigned company.
+                      Select which operational modules this administrator can access within their company.
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -5052,7 +5274,7 @@ function AdminUsersManager({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8, maxHeight: 260, overflowY: 'auto', paddingRight: 4 }}>
                   {AVAILABLE_PERMISSIONS.map((perm) => {
                     const isChecked = permissions.includes(perm.id);
                     const Icon = perm.icon;
@@ -5110,7 +5332,7 @@ function AdminUsersManager({
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
                 {busy ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}
-                {editingUser ? 'Update Account' : 'Create Account'}
+                {editingUser ? 'Update Account' : modalType === 'ENTITY_ADMIN' ? 'Onboard Entity Admin' : 'Create Staff Account'}
               </button>
             </div>
           </form>
