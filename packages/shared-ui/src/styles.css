@@ -355,3 +355,124 @@
   }
 }
 
+/* ==========================================================================
+   Driver Self-Registration Responsive UI / UX
+   ========================================================================== */
+.driver-reg-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 36px 16px;
+}
+.driver-reg-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  padding: 32px 28px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+.driver-reg-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.driver-reg-model-plate-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 12px;
+}
+.driver-reg-specs-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 1fr;
+  gap: 12px;
+}
+.driver-reg-specs-class {
+  grid-column: span 1;
+}
+.driver-reg-toggle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.driver-reg-vehicle-box {
+  background: #f8fafc;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  padding: 18px 16px;
+  display: grid;
+  gap: 14px;
+}
+.driver-photos-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 16px 14px;
+  margin-top: 14px;
+}
+.driver-upload-dropzone {
+  border: 1.5px dashed #38bdf8;
+  background: #f0f9ff;
+  border-radius: 10px;
+  padding: 16px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.driver-upload-dropzone:hover {
+  background: #e0f2fe;
+  border-color: #0284c7;
+}
+.driver-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 640px) {
+  .driver-reg-page {
+    padding: 16px 10px;
+  }
+  .driver-reg-card {
+    padding: 20px 14px;
+    border-radius: 16px;
+  }
+  .driver-reg-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .driver-reg-model-plate-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .driver-reg-specs-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .driver-reg-specs-class {
+    grid-column: span 2;
+  }
+  .driver-reg-vehicle-box {
+    padding: 14px 12px;
+    gap: 12px;
+  }
+  .driver-photos-card {
+    padding: 14px 12px;
+  }
+  .driver-photos-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+}
+@media (max-width: 380px) {
+  .driver-photos-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+

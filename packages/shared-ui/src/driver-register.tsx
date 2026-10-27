@@ -333,23 +333,153 @@ export function DriverRegisterView() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', padding: '40px 16px' }}>
+    <div className="driver-reg-page" style={{ minHeight: '100vh', background: '#f8fafc' }}>
+      <style>{`
+        .driver-reg-page {
+          padding: 36px 16px;
+        }
+        .driver-reg-card {
+          background: #ffffff;
+          border-radius: 20px;
+          border: 1px solid #e2e8f0;
+          padding: 32px 28px;
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+        }
+        .driver-reg-title {
+          font-size: 32px;
+          font-weight: 800;
+          color: #0f172a;
+          margin: 0 0 10px;
+          letter-spacing: -0.5px;
+        }
+        .driver-reg-grid-2col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+        .driver-reg-model-plate-grid {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 12px;
+        }
+        .driver-reg-specs-grid {
+          display: grid;
+          grid-template-columns: 1.4fr 0.8fr 1fr;
+          gap: 12px;
+        }
+        .driver-reg-specs-class {
+          grid-column: span 1;
+        }
+        .driver-reg-toggle-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+        .driver-reg-vehicle-box {
+          background: #f8fafc;
+          border-radius: 14px;
+          border: 1px solid #e2e8f0;
+          padding: 18px 16px;
+          display: grid;
+          gap: 14px;
+        }
+        .driver-photos-card {
+          background: #ffffff;
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
+          padding: 16px 14px;
+          margin-top: 6px;
+        }
+        .driver-upload-dropzone {
+          border: 1.5px dashed #38bdf8;
+          background: #f0f9ff;
+          border-radius: 10px;
+          padding: 18px 14px;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+        }
+        .driver-upload-dropzone:hover {
+          background: #e0f2fe;
+          border-color: #0284c7;
+        }
+        .driver-photos-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+          gap: 10px;
+          margin-top: 10px;
+        }
+
+        @media (max-width: 640px) {
+          .driver-reg-page {
+            padding: 16px 10px !important;
+          }
+          .driver-reg-card {
+            padding: 20px 14px !important;
+            border-radius: 16px !important;
+          }
+          .driver-reg-title {
+            font-size: 24px !important;
+          }
+          .driver-reg-grid-2col {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .driver-reg-model-plate-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .driver-reg-specs-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 10px !important;
+          }
+          .driver-reg-specs-class {
+            grid-column: span 2 !important;
+          }
+          .driver-reg-toggle-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+          }
+          .driver-reg-vehicle-box {
+            padding: 14px 12px !important;
+            gap: 12px !important;
+          }
+          .driver-photos-card {
+            padding: 14px 12px !important;
+          }
+          .driver-photos-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 8px !important;
+          }
+        }
+        @media (max-width: 380px) {
+          .driver-photos-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+      `}</style>
       <div style={{ maxWidth: '680px', margin: '0 auto' }}>
         {/* Header Banner */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '24px', padding: '6px 14px', color: '#1d4ed8', fontSize: '12px', fontWeight: 700, marginBottom: '14px' }}>
             <Sparkles size={14} /> Partner Driver Registration
           </div>
-          <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px', letterSpacing: '-0.5px' }}>
+          <h1 className="driver-reg-title">
             Join As A Cab Driver
           </h1>
-          <p style={{ fontSize: '15px', color: '#64748b', margin: 0, lineHeight: 1.6 }}>
+          <p style={{ fontSize: '14px', color: '#64748b', margin: 0, lineHeight: 1.6 }}>
             Partner with top cab operators. Receive regular passenger bookings, guaranteed fares, and instant settlements.
           </p>
         </div>
 
         {/* Form Container */}
-        <div style={{ background: '#ffffff', borderRadius: '18px', border: '1px solid #e2e8f0', padding: '32px 24px', boxShadow: '0 10px 30px rgba(0,0,0,0.04)' }}>
+        <div className="driver-reg-card">
           {error && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '14px', borderRadius: '10px', marginBottom: '24px', fontSize: '13px', fontWeight: 500 }}>
               <AlertCircle size={18} style={{ flexShrink: 0 }} />
@@ -436,7 +566,7 @@ export function DriverRegisterView() {
                   <small style={{ fontSize: '11px', color: '#64748b' }}>Must match your commercial driving license name.</small>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div className="driver-reg-grid-2col">
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                       Mobile Phone (10 Digits) *
@@ -448,7 +578,7 @@ export function DriverRegisterView() {
                       maxLength={10}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', color: '#0f172a' }}
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', color: '#0f172a', boxSizing: 'border-box' }}
                     />
                     <small style={{ fontSize: '11px', color: '#64748b' }}>WhatsApp booking alerts will be sent here.</small>
                   </div>
@@ -463,7 +593,7 @@ export function DriverRegisterView() {
                       placeholder="e.g. KA202021001234"
                       value={license}
                       onChange={(e) => setLicense(e.target.value.toUpperCase())}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', color: '#0f172a' }}
+                      style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', color: '#0f172a', boxSizing: 'border-box' }}
                     />
                     <small style={{ fontSize: '11px', color: '#64748b' }}>Transport / Commercial Badge License.</small>
                   </div>
@@ -495,12 +625,12 @@ export function DriverRegisterView() {
               </h3>
 
               {/* Vehicle Ownership Options */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '18px' }}>
+              <div className="driver-reg-toggle-grid">
                 <button
                   type="button"
                   onClick={() => setHasVehicle(true)}
                   style={{
-                    padding: '12px',
+                    padding: '12px 10px',
                     borderRadius: '10px',
                     border: hasVehicle ? '2px solid #0284c7' : '1px solid #e2e8f0',
                     background: hasVehicle ? '#f0f9ff' : '#ffffff',
@@ -509,15 +639,22 @@ export function DriverRegisterView() {
                     fontSize: '13px',
                     textAlign: 'center',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: hasVehicle ? '0 2px 6px rgba(2, 132, 199, 0.12)' : 'none',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  🚗 I Have My Own Cab
+                  <span style={{ fontSize: '16px' }}>🚗</span>
+                  <span>I Have My Own Cab</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setHasVehicle(false)}
                   style={{
-                    padding: '12px',
+                    padding: '12px 10px',
                     borderRadius: '10px',
                     border: !hasVehicle ? '2px solid #0284c7' : '1px solid #e2e8f0',
                     background: !hasVehicle ? '#f0f9ff' : '#ffffff',
@@ -526,15 +663,22 @@ export function DriverRegisterView() {
                     fontSize: '13px',
                     textAlign: 'center',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: !hasVehicle ? '0 2px 6px rgba(2, 132, 199, 0.12)' : 'none',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  🏢 Need Company Cab
+                  <span style={{ fontSize: '16px' }}>🏢</span>
+                  <span>Need Company Cab</span>
                 </button>
               </div>
 
               {hasVehicle && (
-                <div style={{ background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '18px', display: 'grid', gap: '14px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                <div className="driver-reg-vehicle-box">
+                  <div className="driver-reg-model-plate-grid">
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                         Vehicle Model *
@@ -545,7 +689,7 @@ export function DriverRegisterView() {
                         placeholder="e.g. Maruti Dzire / Innova Crysta"
                         value={vehicleModel}
                         onChange={(e) => setVehicleModel(e.target.value)}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff' }}
+                        style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff', boxSizing: 'border-box' }}
                       />
                     </div>
 
@@ -558,13 +702,13 @@ export function DriverRegisterView() {
                         placeholder="e.g. KA 20 AB 1234"
                         value={vehicleNumber}
                         onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff' }}
+                        style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff', boxSizing: 'border-box' }}
                       />
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '12px' }}>
-                    <div>
+                  <div className="driver-reg-specs-grid">
+                    <div className="driver-reg-specs-class">
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                         Vehicle Class
                       </label>
@@ -578,7 +722,7 @@ export function DriverRegisterView() {
                             setVehicleCapacity(matched.defaultCapacity);
                           }
                         }}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff' }}
+                        style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff', boxSizing: 'border-box' }}
                       >
                         {VEHICLE_CLASS_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -598,7 +742,7 @@ export function DriverRegisterView() {
                         max="60"
                         value={vehicleCapacity}
                         onChange={(e) => setVehicleCapacity(e.target.value)}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff' }}
+                        style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff', boxSizing: 'border-box' }}
                       />
                     </div>
 
@@ -609,7 +753,7 @@ export function DriverRegisterView() {
                       <select
                         value={vehicleAc ? 'yes' : 'no'}
                         onChange={(e) => setVehicleAc(e.target.value === 'yes')}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff' }}
+                        style={{ width: '100%', padding: '11px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff', boxSizing: 'border-box' }}
                       >
                         <option value="yes">❄️ AC Equipped</option>
                         <option value="no">Non-AC</option>
@@ -628,7 +772,7 @@ export function DriverRegisterView() {
                         placeholder="e.g. Vintage Car, Force Cruiser, Ambulance, Mini Truck, 50-Seater Sleeper Coach"
                         value={customVehicleType}
                         onChange={(e) => setCustomVehicleType(e.target.value)}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #22c55e', fontSize: '13px', color: '#0f172a', background: '#fff' }}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #22c55e', fontSize: '13px', color: '#0f172a', background: '#fff', boxSizing: 'border-box' }}
                       />
                       <span style={{ fontSize: '11px', color: '#15803d', lineHeight: 1.4 }}>
                         Enter your exact vehicle category or body type if it is not in the list above.
@@ -637,69 +781,108 @@ export function DriverRegisterView() {
                   )}
 
                   {/* Vehicle Photos Upload Section */}
-                  <div style={{ marginTop: '12px', padding: '16px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Camera size={16} color="#0284c7" />
-                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Vehicle Photos</span>
-                        <span style={{ fontSize: '11px', color: '#64748b' }}>(Optional · Max 5)</span>
+                  <div className="driver-photos-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Camera size={15} color="#0284c7" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>Vehicle Photos</div>
+                          <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.2 }}>Front, sides, interior, rear</div>
+                        </div>
                       </div>
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: vehicleImages.length > 0 ? '#ecfdf5' : '#f1f5f9', color: vehicleImages.length > 0 ? '#047857' : '#64748b' }}>
-                        {vehicleImages.length} / 5 Photos
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: '12px', background: vehicleImages.length > 0 ? '#ecfdf5' : '#f1f5f9', color: vehicleImages.length > 0 ? '#047857' : '#64748b' }}>
+                        {vehicleImages.length} / 5
                       </span>
                     </div>
 
-                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 12px', lineHeight: 1.5 }}>
-                      Upload photos of your vehicle (Front, Side, Interior, Rear) from your phone gallery or take new photos with your camera.
-                    </p>
-
-                    {vehicleImages.length < 5 && (
-                      <div style={{ marginBottom: vehicleImages.length > 0 ? '12px' : '0' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#0284c7', color: '#ffffff', padding: '10px 16px', borderRadius: '8px', cursor: uploadingImage ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '13px', boxShadow: '0 2px 6px rgba(2, 132, 199, 0.2)' }}>
-                          <Camera size={16} />
-                          {uploadingImage ? 'Compressing & Uploading…' : 'Take / Upload Photos (Camera / Gallery)'}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            disabled={uploadingImage}
-                            onChange={handleImageUpload}
-                            style={{ display: 'none' }}
-                          />
-                        </label>
-                      </div>
-                    )}
-
-                    {vehicleImages.length > 0 && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: '10px', marginTop: '10px' }}>
-                        {vehicleImages.map((imgSrc, idx) => (
-                          <div key={idx} style={{ position: 'relative', height: '80px', borderRadius: '8px', overflow: 'hidden', border: idx === 0 ? '2px solid #0284c7' : '1px solid #cbd5e1', background: '#0f172a' }}>
-                            <img src={imgSrc} alt={`Vehicle photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            {idx === 0 && (
-                              <span style={{ position: 'absolute', top: 4, left: 4, background: '#0284c7', color: '#ffffff', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px' }}>
-                                ★ Cover
-                              </span>
-                            )}
-                            {idx > 0 && (
+                    {vehicleImages.length === 0 ? (
+                      <label
+                        className="driver-upload-dropzone"
+                        style={{ cursor: uploadingImage ? 'not-allowed' : 'pointer' }}
+                      >
+                        <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(2, 132, 199, 0.15)', marginBottom: '4px' }}>
+                          <Camera size={18} color="#0284c7" />
+                        </div>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0284c7' }}>
+                          {uploadingImage ? 'Compressing & Attaching Photos…' : 'Tap to Add Vehicle Photos'}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>
+                          Use Camera or Phone Gallery · Max 5 photos
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          disabled={uploadingImage}
+                          onChange={handleImageUpload}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    ) : (
+                      <div>
+                        <div className="driver-photos-grid">
+                          {vehicleImages.map((imgSrc, idx) => (
+                            <div key={idx} style={{ position: 'relative', height: '84px', borderRadius: '8px', overflow: 'hidden', border: idx === 0 ? '2px solid #0284c7' : '1px solid #cbd5e1', background: '#0f172a' }}>
+                              <img src={imgSrc} alt={`Vehicle photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              {idx === 0 && (
+                                <span style={{ position: 'absolute', top: 4, left: 4, background: '#0284c7', color: '#ffffff', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px' }}>
+                                  ★ Cover
+                                </span>
+                              )}
+                              {idx > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetCover(idx)}
+                                  title="Set as Main Cover Photo"
+                                  style={{ position: 'absolute', bottom: 4, left: 4, background: 'rgba(15,23,42,0.85)', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '2px 5px', fontSize: '9px', fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                  Cover
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                onClick={() => handleSetCover(idx)}
-                                title="Set as Main Cover Photo"
-                                style={{ position: 'absolute', bottom: 4, left: 4, background: 'rgba(15,23,42,0.85)', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '2px 5px', fontSize: '9px', fontWeight: 700, cursor: 'pointer' }}
+                                onClick={() => handleRemoveImage(idx)}
+                                title="Delete photo"
+                                style={{ position: 'absolute', top: 4, right: 4, background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
                               >
-                                Set Cover
+                                ✕
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveImage(idx)}
-                              title="Delete photo"
-                              style={{ position: 'absolute', top: 4, right: 4, background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
+                            </div>
+                          ))}
+
+                          {vehicleImages.length < 5 && (
+                            <label
+                              style={{
+                                height: '84px',
+                                borderRadius: '8px',
+                                border: '1.5px dashed #38bdf8',
+                                background: '#f0f9ff',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                                color: '#0284c7',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                              }}
                             >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
+                              <Camera size={18} />
+                              <span>{uploadingImage ? '...' : '+ Add'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                disabled={uploadingImage}
+                                onChange={handleImageUpload}
+                                style={{ display: 'none' }}
+                              />
+                            </label>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
