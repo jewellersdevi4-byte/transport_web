@@ -161,33 +161,40 @@ export function DriverRegisterView() {
             <CheckCircle size={36} />
           </div>
 
-          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px' }}>Application Submitted!</h2>
+          <span style={{ display: 'inline-block', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 800, marginBottom: '12px' }}>
+            ACTIVE DRIVER PARTNER
+          </span>
+
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px' }}>Registration Successful!</h2>
           <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.6, margin: '0 0 24px' }}>
-            Thank you, <strong>{name}</strong>. Your driver partner application has been submitted to <strong>{submittedResult.entityName}</strong> and is currently under admin verification.
+            Welcome aboard, <strong>{name}</strong>! You are now registered and active as a driver partner with <strong>{submittedResult.entityName}</strong>.
           </p>
 
           <div style={{ background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '18px', textAlign: 'left', marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <ShieldCheck size={18} color="#0284c7" />
-              <strong style={{ fontSize: '13px', color: '#0f172a' }}>What happens next?</strong>
+              <ShieldCheck size={18} color="#16a34a" />
+              <strong style={{ fontSize: '13px', color: '#0f172a' }}>You are ready to receive bookings</strong>
             </div>
             <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#64748b', lineHeight: 1.7 }}>
-              <li>The dispatch administrator at <strong>{submittedResult.entityName}</strong> will verify your driving license and vehicle registration.</li>
-              <li>Once approved, you will receive an automated <strong>WhatsApp / SMS confirmation</strong> and your status will become active for trip assignments.</li>
-              <li>You can start receiving passenger bookings directly on your WhatsApp.</li>
+              <li>Your driver profile has been activated with <strong>{submittedResult.entityName}</strong>.</li>
+              {hasVehicle && vehicleModel && (
+                <li>Your vehicle (<strong>{vehicleModel}</strong>{vehicleNumber ? ` - ${vehicleNumber}` : ''}) is added to the active fleet.</li>
+              )}
+              <li>Dispatch requests in your area will be sent directly to your WhatsApp at <strong>+91 {phone}</strong>.</li>
+              <li>You can accept or decline trips directly via WhatsApp with 1 tap.</li>
             </ul>
           </div>
 
           {selectedEntity?.contactPhone && (
             <div style={{ marginBottom: '28px', fontSize: '13px', color: '#475569' }}>
-              Questions about your application?{' '}
+              Have questions or want to check in with dispatch?{' '}
               <a
-                href={`https://wa.me/91${selectedEntity.contactPhone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hello, I have submitted my driver application (Ref: ${submittedResult.driverId}) for ${submittedResult.entityName}. Please review and approve.`)}`}
+                href={`https://wa.me/91${selectedEntity.contactPhone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hello, I have registered as a driver (${name}, Phone: +91 ${phone}) for ${submittedResult.entityName}. Please share upcoming trips.`)}`}
                 target="_blank"
                 rel="noreferrer"
                 style={{ color: '#0284c7', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
               >
-                Contact Dispatch WhatsApp <ExternalLink size={13} />
+                Message Dispatch on WhatsApp <ExternalLink size={13} />
               </a>
             </div>
           )}
@@ -208,7 +215,7 @@ export function DriverRegisterView() {
                 fontSize: '14px',
               }}
             >
-              Return to Home
+              Return to Website
             </a>
           </div>
         </div>
@@ -524,7 +531,7 @@ export function DriverRegisterView() {
               <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 <ShieldCheck size={18} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
-                  By submitting this application, you declare that all provided driving license and vehicle information is genuine and valid under Indian transport regulations. Applications are subject to admin review prior to trip allocation.
+                  By registering, you declare that all provided driving license and vehicle information is genuine and valid under Indian transport regulations. Your driver profile and vehicle will be activated immediately.
                 </p>
               </div>
             </div>
@@ -549,9 +556,9 @@ export function DriverRegisterView() {
                 boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
               }}
             >
-              {submitting ? 'Submitting Application…' : (
+              {submitting ? 'Registering Driver Profile…' : (
                 <>
-                  Submit Application For Approval <ArrowRight size={18} />
+                  Complete Registration & Activate Profile <ArrowRight size={18} />
                 </>
               )}
             </button>
