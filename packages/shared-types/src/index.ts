@@ -172,6 +172,16 @@ export interface VehiclePackage {
   estimatedFare?: number;
 }
 
+export type DriverApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface DriverVehicleDetails {
+  model: string;
+  number?: string;
+  type: VehicleType;
+  capacity: number;
+  ac: boolean;
+}
+
 export interface Driver {
   id: string;
   entityId?: string;
@@ -180,6 +190,12 @@ export interface Driver {
   license: string;
   vehicleId: string;
   status: 'Available' | 'On Trip' | 'Inactive';
+  approvalStatus?: DriverApprovalStatus;
+  rejectionReason?: string;
+  registeredAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  vehicleDetails?: DriverVehicleDetails;
   rating: number;
   trips: number;
   baseLocation?: string;

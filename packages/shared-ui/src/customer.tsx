@@ -156,6 +156,21 @@ export default function CustomerApp() {
           <button className={page === 'download' ? 'active' : ''} onClick={() => navigate('download')}>
             <Smartphone size={15} style={{ verticalAlign: 'text-bottom' }} /> Android App
           </button>
+          <a
+            href="/driver/register"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--muted)',
+              padding: '10px 0',
+              textDecoration: 'none',
+            }}
+          >
+            <Car size={15} style={{ verticalAlign: 'text-bottom' }} /> Drive with us
+          </a>
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -507,6 +522,7 @@ export default function CustomerApp() {
           <button onClick={() => navigate('track')}>Track a ride</button>
           <button onClick={() => navigate('routes')}>Popular routes</button>
           <button onClick={() => navigate('download')}>Download APK</button>
+          <a href="/driver/register">Drive with Us (Register)</a>
           <a href={`tel:${config.data?.settings.phone || '+918047123456'}`}>Support</a>
           <a href="/admin" target="_blank" rel="noreferrer">
             Admin Portal <ExternalLink size={12} style={{ verticalAlign: 'middle' }} />

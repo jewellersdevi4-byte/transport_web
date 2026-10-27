@@ -177,6 +177,12 @@ export default function AdminApp() {
   );
   const pendingCount = pendingFeedback.data?.pendingCount || 0;
 
+  const pendingDrivers = useResource<Driver[]>(
+    userPermissions.includes('fleet') ? '/admin/drivers?approvalStatus=PENDING' : '',
+    session.token
+  );
+  const pendingDriverCount = pendingDrivers.data?.length || 0;
+
   if (!session.ready) return <Loading />;
   if (!session.token) {
     return (
@@ -229,6 +235,11 @@ export default function AdminApp() {
               {name}
               {name === 'Bookings' && <span className="nav-dot" />}
               {name === 'Admins' && <span className="nav-dot" style={{ background: '#7c3aed' }} />}
+              {name === 'Fleet' && pendingDriverCount > 0 && (
+                <span className="badge" style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: '0.72rem', padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>
+                  {pendingDriverCount}
+                </span>
+              )}
               {name === 'Reviews' && pendingCount > 0 && (
                 <span className="badge" style={{ marginLeft: 'auto', background: '#f59e0b', color: '#fff', fontSize: '0.72rem', padding: '1px 7px', borderRadius: 10, fontWeight: 700 }}>
                   {pendingCount}
@@ -321,6 +332,7 @@ export default function AdminApp() {
           ) : page === 'Fleet' || page === 'Drivers' || page === 'Vehicles' ? (
             <Fleet
               token={session.token}
+              onDriverChange={() => pendingDrivers.reload()}
             />
           ) : page === 'Routes' ? (
             <RoutesPage
@@ -1342,10 +1354,12 @@ async function compressImageFile(file: File, maxWidth = 1000, maxHeight = 750, q
   });
 }
 
-function Fleet({ token, entityId }: { token: string; entityId?: string }) {
+function Fleet({ token, entityId, onDriverChange }: { token: string; entityId?: string; onDriverChange?: () => void }) {
   const entityQuery = entityId && entityId !== 'all' ? `?entityId=${encodeURIComponent(entityId)}` : '';
   const r = useResource<(Vehicle & { driverName?: string; driverPhone?: string; driverLicense?: string })[]>(`/admin/vehicles${entityQuery}`, token);
+  const driversRes = useResource<Driver[]>(`/admin/drivers${entityQuery}`, token);
   const settings = useResource<Settings>(`/admin/settings${entityQuery}`, token);
+  const [fleetTab, setFleetTab] = useState<'vehicles' | 'drivers' | 'approvals'>('vehicles');
   const [query, setQuery] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -1500,11 +1514,48 @@ function Fleet({ token, entityId }: { token: string; entityId?: string }) {
 
   const isDirectActive = Boolean(settings.data?.directVehicleBooking);
 
+  const allDrivers = driversRes.data || [];
+  const pendingDrivers = allDrivers.filter((d) => (d.approvalStatus || 'APPROVED') === 'PENDING');
+  const activeDrivers = allDrivers.filter((d) => (d.approvalStatus || 'APPROVED') !== 'PENDING');
+
+  async function handleApproveDriver(driverId: string, driverName: string) {
+    if (!window.confirm(`Approve driver application for ${driverName}? This driver will become Active and their vehicle will be added to the fleet.`)) return;
+    try {
+      await api(`/admin/drivers/${driverId}/approve`, {
+        method: 'POST',
+        token,
+      });
+      alert(`Driver ${driverName} approved successfully!`);
+      driversRes.reload();
+      r.reload();
+      onDriverChange?.();
+    } catch (e) {
+      alert('Failed to approve driver: ' + (e as Error).message);
+    }
+  }
+
+  async function handleRejectDriver(driverId: string, driverName: string) {
+    const reason = window.prompt(`Enter reason for declining application for ${driverName}:`, 'Incomplete or unverified license documentation');
+    if (reason === null) return;
+    try {
+      await api(`/admin/drivers/${driverId}/reject`, {
+        method: 'POST',
+        token,
+        body: { reason: reason.trim() },
+      });
+      alert(`Driver application declined.`);
+      driversRes.reload();
+      onDriverChange?.();
+    } catch (e) {
+      alert('Failed to decline driver: ' + (e as Error).message);
+    }
+  }
+
   return (
     <>
       <Heading
         title="Fleet & Chauffeurs"
-        description="Unified commercial vehicles and attached chauffeur contacts. When Direct Booking is enabled, customers select vehicles directly with auto-confirmation."
+        description="Unified commercial vehicles, driver credentials, and pending driver partner registrations."
         action={
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <button
@@ -1530,136 +1581,371 @@ function Fleet({ token, entityId }: { token: string; entityId?: string }) {
         }
       />
 
-      <div className="filters">
-        <label className="search-field">
-          <Search size={16} />
-          <input
-            aria-label="Search fleet"
-            placeholder="Search vehicles or chauffeurs by model, number, driver name…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
+      {/* Sub Tabs */}
+      <div className="tab-switcher" style={{ marginBottom: 20 }}>
+        <button
+          type="button"
+          className={fleetTab === 'vehicles' ? 'active' : ''}
+          onClick={() => setFleetTab('vehicles')}
+        >
+          <Car size={15} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />
+          Fleet Vehicles ({r.data?.length || 0})
+        </button>
+        <button
+          type="button"
+          className={fleetTab === 'drivers' ? 'active' : ''}
+          onClick={() => setFleetTab('drivers')}
+        >
+          <Users size={15} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />
+          Active Chauffeurs ({activeDrivers.length})
+        </button>
+        <button
+          type="button"
+          className={fleetTab === 'approvals' ? 'active' : ''}
+          onClick={() => setFleetTab('approvals')}
+          style={{ position: 'relative' }}
+        >
+          <CheckCircle2 size={15} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />
+          Driver Approvals
+          {pendingDrivers.length > 0 && (
+            <span
+              style={{
+                marginLeft: 8,
+                background: '#dc2626',
+                color: '#fff',
+                padding: '2px 8px',
+                borderRadius: 12,
+                fontSize: '0.72rem',
+                fontWeight: 800,
+              }}
+            >
+              {pendingDrivers.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {r.loading ? (
-        <Loading />
-      ) : r.error ? (
-        <ErrorBox message={r.error} retry={r.reload} />
-      ) : (
-        <div className="grid-three">
-          {r.data
-            ?.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()))
-            .map((item) => (
-              <article key={item.id} className="card fleet-card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ position: 'relative', height: 160, width: '100%', background: '#0f172a' }}>
-                  {item.images && item.images.length > 0 ? (
-                    <img
-                      src={item.images[0]}
-                      alt={item.model}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#94a3b8' }}>
-                      <Car size={42} strokeWidth={1.2} />
-                    </div>
-                  )}
-                  {item.images && item.images.length > 0 && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        bottom: 8,
-                        right: 8,
-                        background: 'rgba(15,23,42,0.8)',
-                        color: '#fff',
-                        padding: '2px 8px',
-                        borderRadius: 12,
-                        fontSize: '0.74rem',
-                        fontWeight: 600,
-                        backdropFilter: 'blur(4px)',
-                      }}
-                    >
-                      {item.images.length} / 5 photos
-                    </span>
-                  )}
-                </div>
-                <div style={{ padding: 16 }}>
-                  <div className="section-title">
-                    <div className="vehicle-icon">
-                      <Car size={26} />
-                    </div>
-                    <Badge value={item.status} />
-                  </div>
-                  <h2>{item.model}</h2>
-                  <p><strong>{item.number || 'Registration not added'}</strong></p>
-                  <p className="muted">
-                    {item.type} · {item.capacity} seats · {item.ac ? 'Climate Controlled AC' : 'Non-AC'}
-                  </p>
+      {fleetTab === 'vehicles' && (
+        <>
+          <div className="filters">
+            <label className="search-field">
+              <Search size={16} />
+              <input
+                aria-label="Search fleet"
+                placeholder="Search vehicles or chauffeurs by model, number, driver name…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
+          </div>
 
-                  <div style={{ margin: '12px 0', padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                    <p style={{ margin: '0 0 4px', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700 }}>
-                      ASSIGNED CHAUFFEUR
-                    </p>
-                    {item.driverName ? (
-                      <>
-                        <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
-                          {item.driverName}
-                        </p>
-                        <p style={{ margin: '2px 0 0', color: '#059669', fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Phone size={13} /> +91 {item.driverPhone} (WhatsApp)
-                        </p>
-                        {item.driver && (
-                          <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.8rem' }}>
-                            ★ {item.driver.rating || 5.0} · {item.driver.trips || 0} completed trips
-                          </p>
-                        )}
-                        <p style={{ margin: '3px 0 0', color: item.driver?.baseLocation ? '#64748b' : '#b45309', fontSize: '0.78rem' }}>
-                          {item.driver?.baseLocation ? `Based in ${item.driver.baseLocation} · ${item.driver.serviceRadiusKm || 30} km service radius` : 'Set a base location to include this driver in customer searches'}
-                        </p>
-                        {(item.driverLicense || item.driver?.license) && (
-                          <p style={{ margin: '2px 0 0', color: '#94a3b8', fontSize: '0.76rem' }}>
-                            License: {item.driverLicense || item.driver?.license}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p style={{ margin: 0, color: '#d97706', fontSize: '0.86rem', fontWeight: 600 }}>
-                        No chauffeur contact attached
+          {r.loading ? (
+            <Loading />
+          ) : r.error ? (
+            <ErrorBox message={r.error} retry={r.reload} />
+          ) : (
+            <div className="grid-three">
+              {r.data
+                ?.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()))
+                .map((item) => (
+                  <article key={item.id} className="card fleet-card" style={{ padding: 0, overflow: 'hidden' }}>
+                    <div style={{ position: 'relative', height: 160, width: '100%', background: '#0f172a' }}>
+                      {item.images && item.images.length > 0 ? (
+                        <img
+                          src={item.images[0]}
+                          alt={item.model}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#94a3b8' }}>
+                          <Car size={42} strokeWidth={1.2} />
+                        </div>
+                      )}
+                      {item.images && item.images.length > 0 && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            bottom: 8,
+                            right: 8,
+                            background: 'rgba(15,23,42,0.8)',
+                            color: '#fff',
+                            padding: '2px 8px',
+                            borderRadius: 12,
+                            fontSize: '0.74rem',
+                            fontWeight: 600,
+                            backdropFilter: 'blur(4px)',
+                          }}
+                        >
+                          {item.images.length} / 5 photos
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ padding: 16 }}>
+                      <div className="section-title">
+                        <div className="vehicle-icon">
+                          <Car size={26} />
+                        </div>
+                        <Badge value={item.status} />
+                      </div>
+                      <h2>{item.model}</h2>
+                      <p><strong>{item.number || 'Registration not added'}</strong></p>
+                      <p className="muted">
+                        {item.type} · {item.capacity} seats · {item.ac ? 'Climate Controlled AC' : 'Non-AC'}
                       </p>
+
+                      <div style={{ margin: '12px 0', padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                        <p style={{ margin: '0 0 4px', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700 }}>
+                          ASSIGNED CHAUFFEUR
+                        </p>
+                        {item.driverName ? (
+                          <>
+                            <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
+                              {item.driverName}
+                            </p>
+                            <p style={{ margin: '2px 0 0', color: '#059669', fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Phone size={13} /> +91 {item.driverPhone} (WhatsApp)
+                            </p>
+                            {item.driver && (
+                              <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.8rem' }}>
+                                ★ {item.driver.rating || 5.0} · {item.driver.trips || 0} completed trips
+                              </p>
+                            )}
+                            <p style={{ margin: '3px 0 0', color: item.driver?.baseLocation ? '#64748b' : '#b45309', fontSize: '0.78rem' }}>
+                              {item.driver?.baseLocation ? `Based in ${item.driver.baseLocation} · ${item.driver.serviceRadiusKm || 30} km service radius` : 'Set a base location to include this driver in customer searches'}
+                            </p>
+                            {(item.driverLicense || item.driver?.license) && (
+                              <p style={{ margin: '2px 0 0', color: '#94a3b8', fontSize: '0.76rem' }}>
+                                License: {item.driverLicense || item.driver?.license}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p style={{ margin: 0, color: '#d97706', fontSize: '0.86rem', fontWeight: 600 }}>
+                            No chauffeur contact attached
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="actions">
+                        <button
+                          className="secondary"
+                          onClick={() => {
+                            setEdit({
+                              id: item.id,
+                              type: item.type,
+                              number: item.number || '',
+                              model: item.model,
+                              capacity: item.capacity,
+                              ac: item.ac,
+                              status: item.status,
+                              images: item.images ? [...item.images] : [],
+                              driverName: item.driverName || item.driver?.name || '',
+                              driverPhone: item.driverPhone || item.driver?.phone || '',
+                              driverLicense: item.driverLicense || item.driver?.license || '',
+                              driverBaseLocation: item.driver?.baseLocation || '',
+                              driverBaseLocationPlaceId: item.driver?.baseLocationPlaceId || '',
+                              driverServiceRadiusKm: item.driver?.serviceRadiusKm || 30,
+                              packages: item.packages || [],
+                            });
+                            setError('');
+                          }}
+                        >
+                          Edit Vehicle & Chauffeur
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {fleetTab === 'drivers' && (
+        <section className="card panel">
+          <div className="section-title">
+            <div>
+              <h2>Registered Fleet Chauffeurs</h2>
+              <p className="muted">All verified commercial drivers active on the dispatch network.</p>
+            </div>
+            <span className="badge" style={{ background: '#ecfdf5', color: '#047857', fontWeight: 700 }}>
+              {activeDrivers.length} Active Drivers
+            </span>
+          </div>
+
+          {driversRes.loading ? (
+            <Loading />
+          ) : activeDrivers.length === 0 ? (
+            <div className="empty">
+              <p>No drivers currently listed in the fleet.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14, marginTop: 16 }}>
+              {activeDrivers.map((d) => (
+                <div key={d.id} className="card" style={{ padding: 16, border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#0f172a' }}>{d.name}</h3>
+                      <p style={{ margin: 0, color: '#059669', fontSize: '0.85rem', fontWeight: 600 }}>
+                        📞 +91 {d.phone}
+                      </p>
+                    </div>
+                    <Badge value={d.status || 'Available'} />
+                  </div>
+
+                  <div style={{ margin: '10px 0', fontSize: '0.8rem', color: '#64748b', display: 'grid', gap: 4 }}>
+                    <div>License: <strong style={{ color: '#334155' }}>{d.license}</strong></div>
+                    <div>Base: {d.baseLocation || 'Kaup / Udupi'} ({d.serviceRadiusKm || 30} km)</div>
+                    <div>Rating: ★ {d.rating || 5.0} · {d.trips || 0} completed journeys</div>
+                    {d.entityId && <div>Entity: <span className="badge">{d.entityId}</span></div>}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
+                    <a
+                      href={`https://wa.me/91${d.phone.replace(/\D/g, '').slice(-10)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="secondary small"
+                      style={{ flex: 1, textAlign: 'center', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                    >
+                      <Phone size={13} /> WhatsApp
+                    </a>
+                    <a
+                      href={`tel:${d.phone}`}
+                      className="secondary small"
+                      style={{ textAlign: 'center', textDecoration: 'none' }}
+                    >
+                      Call
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {fleetTab === 'approvals' && (
+        <section className="card panel">
+          <div className="section-title">
+            <div>
+              <h2>Pending Driver Partner Applications</h2>
+              <p className="muted">
+                Review driver self-registrations submitted via{' '}
+                <a href="/driver/register" target="_blank" rel="noreferrer" style={{ color: '#0284c7', fontWeight: 600 }}>
+                  /driver/register <ExternalLink size={12} style={{ verticalAlign: 'middle' }} />
+                </a>. Verify commercial credentials and approve for active dispatch.
+              </p>
+            </div>
+            <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontWeight: 700, padding: '6px 12px', borderRadius: 8 }}>
+              {pendingDrivers.length} Awaiting Verification
+            </span>
+          </div>
+
+          {driversRes.loading ? (
+            <Loading />
+          ) : pendingDrivers.length === 0 ? (
+            <div className="empty" style={{ padding: '48px 20px', textAlign: 'center' }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#ecfdf5', color: '#10b981', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                <CheckCircle2 size={30} />
+              </div>
+              <h3>No Pending Driver Applications</h3>
+              <p className="muted">All chauffeur registrations are verified. Drivers can self-register using the portal link:</p>
+              <div style={{ marginTop: 14 }}>
+                <code style={{ background: '#f1f5f9', padding: '8px 14px', borderRadius: 8, fontSize: '0.86rem', color: '#0f172a' }}>
+                  https://miles.devijewellers.in/driver/register
+                </code>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, marginTop: 18 }}>
+              {pendingDrivers.map((d) => (
+                <div key={d.id} className="card" style={{ padding: 20, border: '1px solid #fed7aa', background: '#fffcf9', borderRadius: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div>
+                      <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontWeight: 800, marginBottom: 6 }}>
+                        PENDING APPROVAL
+                      </span>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a' }}>{d.name}</h3>
+                      <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.82rem' }}>
+                        Applied {d.registeredAt ? new Date(d.registeredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recently'}
+                      </p>
+                    </div>
+                    {d.entityId && (
+                      <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8', fontWeight: 700 }}>
+                        {d.entityId}
+                      </span>
                     )}
                   </div>
 
-                  <div className="actions">
+                  <div style={{ display: 'grid', gap: 8, fontSize: '0.85rem', margin: '14px 0', padding: '12px', background: '#ffffff', borderRadius: 10, border: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Phone size={14} color="#0284c7" />
+                      <strong>Phone:</strong>
+                      <a href={`tel:${d.phone}`} style={{ color: '#0284c7', fontWeight: 700 }}>+91 {d.phone}</a>
+                      <a
+                        href={`https://wa.me/91${d.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hello ${d.name}, we are reviewing your driver application for DJ Cabs / ${d.entityId}.`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="badge"
+                        style={{ marginLeft: 'auto', background: '#dcfce7', color: '#15803d', fontWeight: 700 }}
+                      >
+                        WhatsApp
+                      </a>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <FileText size={14} color="#64748b" />
+                      <strong>Driving License:</strong>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>{d.license}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <MapPin size={14} color="#64748b" />
+                      <strong>Base Location:</strong>
+                      <span style={{ color: '#475569' }}>{d.baseLocation || 'Kaup / Udupi'} ({d.serviceRadiusKm || 30} km radius)</span>
+                    </div>
+                  </div>
+
+                  {d.vehicleDetails ? (
+                    <div style={{ margin: '12px 0', padding: '12px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                      <p style={{ margin: '0 0 6px', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700 }}>
+                        🚗 APPLICANT VEHICLE SPECIFICATION
+                      </p>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+                        {d.vehicleDetails.model}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
+                        {d.vehicleDetails.type} · {d.vehicleDetails.capacity} Seats · {d.vehicleDetails.ac ? '❄️ AC' : 'Non-AC'}
+                        {d.vehicleDetails.number && ` · Plate: ${d.vehicleDetails.number}`}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ margin: '12px 0', padding: '12px', background: '#f8fafc', borderRadius: 10, color: '#64748b', fontSize: '0.82rem' }}>
+                      🏢 Driver applicant requested company vehicle assignment.
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                     <button
-                      className="secondary"
-                      onClick={() => {
-                        setEdit({
-                          id: item.id,
-                          type: item.type,
-                          number: item.number || '',
-                          model: item.model,
-                          capacity: item.capacity,
-                          ac: item.ac,
-                          status: item.status,
-                          images: item.images ? [...item.images] : [],
-                          driverName: item.driverName || item.driver?.name || '',
-                          driverPhone: item.driverPhone || item.driver?.phone || '',
-                          driverLicense: item.driverLicense || item.driver?.license || '',
-                          driverBaseLocation: item.driver?.baseLocation || '',
-                          driverBaseLocationPlaceId: item.driver?.baseLocationPlaceId || '',
-                          driverServiceRadiusKm: item.driver?.serviceRadiusKm || 30,
-                          packages: item.packages || [],
-                        });
-                        setError('');
-                      }}
+                      type="button"
+                      className="primary small"
+                      style={{ flex: 1, background: '#16a34a' }}
+                      onClick={() => handleApproveDriver(d.id, d.name)}
                     >
-                      Edit Vehicle & Chauffeur
+                      <Check size={14} /> Approve Driver
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-button small"
+                      onClick={() => handleRejectDriver(d.id, d.name)}
+                    >
+                      <X size={14} /> Reject
                     </button>
                   </div>
                 </div>
-              </article>
-            ))}
-        </div>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {edit && (
