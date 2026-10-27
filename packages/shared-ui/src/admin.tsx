@@ -1365,7 +1365,7 @@ function Fleet({ token, entityId, onDriverChange }: { token: string; entityId?: 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [edit, setEdit] = useState<{
     id?: string;
-    type: 'Sedan' | 'SUV' | 'Tempo Traveller';
+    type: string;
     number: string;
     model: string;
     capacity: number;
@@ -1956,12 +1956,45 @@ function Fleet({ token, entityId, onDriverChange }: { token: string; entityId?: 
             <p className="eyebrow" style={{ marginTop: 0 }}>VEHICLE SPECIFICATIONS</p>
             <div className="form-grid">
               <label>
-                Vehicle Type
-                <select value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value as any })}>
-                  <option value="Sedan">Sedan</option>
-                  <option value="SUV">SUV</option>
-                  <option value="Tempo Traveller">Tempo Traveller</option>
+                Vehicle Class
+                <select
+                  value={[
+                    'Sedan', 'SUV', 'Tempo Traveller', 'Hatchback', 'Premium Sedan',
+                    'Premium SUV', 'MUV', 'Mini Bus', 'Bus', 'Luxury', 'Auto / Rickshaw', 'Electric Vehicle (EV)'
+                  ].includes(edit.type) ? edit.type : 'Other'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'Other') {
+                      setEdit({ ...edit, type: '' });
+                    } else {
+                      setEdit({ ...edit, type: val });
+                    }
+                  }}
+                >
+                  <option value="Hatchback">Hatchback (WagonR, Swift)</option>
+                  <option value="Sedan">Sedan (Dzire, Etios)</option>
+                  <option value="Premium Sedan">Premium Sedan (City, Verna)</option>
+                  <option value="SUV">SUV (Ertiga, Carens, Bolero)</option>
+                  <option value="Premium SUV">Premium SUV / MUV (Innova Crysta)</option>
+                  <option value="Tempo Traveller">Tempo Traveller (Minivan)</option>
+                  <option value="Mini Bus">Mini Bus (21–33 Seater)</option>
+                  <option value="Bus">Bus / Coach</option>
+                  <option value="Luxury">Luxury (Mercedes, BMW, Audi)</option>
+                  <option value="Electric Vehicle (EV)">Electric Vehicle (EV)</option>
+                  <option value="Auto / Rickshaw">Auto / Rickshaw</option>
+                  <option value="Other">✏️ Other (Custom...)</option>
                 </select>
+                {(![
+                  'Sedan', 'SUV', 'Tempo Traveller', 'Hatchback', 'Premium Sedan',
+                  'Premium SUV', 'MUV', 'Mini Bus', 'Bus', 'Luxury', 'Auto / Rickshaw', 'Electric Vehicle (EV)'
+                ].includes(edit.type) || edit.type === '') && (
+                  <input
+                    style={{ marginTop: '8px' }}
+                    placeholder="Type custom vehicle class (e.g. Vintage Car)"
+                    value={edit.type}
+                    onChange={(e) => setEdit({ ...edit, type: e.target.value })}
+                  />
+                )}
               </label>
               <label>
                 Vehicle Name

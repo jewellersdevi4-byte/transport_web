@@ -35,6 +35,21 @@ interface RegisterResponse {
   status: string;
 }
 
+export const VEHICLE_CLASS_OPTIONS = [
+  { value: 'Hatchback', label: 'Hatchback (WagonR, Swift, Tiago, i10)', defaultCapacity: '4' },
+  { value: 'Sedan', label: 'Sedan (Dzire, Etios, Amaze, Aura)', defaultCapacity: '4' },
+  { value: 'Premium Sedan', label: 'Premium Sedan (City, Verna, Ciaz)', defaultCapacity: '4' },
+  { value: 'SUV', label: 'SUV (Ertiga, Carens, Bolero, Scorpio)', defaultCapacity: '6' },
+  { value: 'Premium SUV', label: 'Premium SUV / MUV (Innova Crysta, Hycross, Fortuner)', defaultCapacity: '7' },
+  { value: 'Tempo Traveller', label: 'Tempo Traveller / Minivan (12–20 Seater)', defaultCapacity: '12' },
+  { value: 'Mini Bus', label: 'Mini Bus (21–33 Seater)', defaultCapacity: '25' },
+  { value: 'Bus', label: 'Bus / Coach (34+ Seater)', defaultCapacity: '40' },
+  { value: 'Luxury', label: 'Luxury (Mercedes, BMW, Audi, Camry)', defaultCapacity: '4' },
+  { value: 'Electric Vehicle (EV)', label: 'Electric Vehicle - EV (Nexon, Tiago, ZS EV)', defaultCapacity: '4' },
+  { value: 'Auto / Rickshaw', label: 'Auto / 3-Wheeler (Rickshaw, E-Rickshaw)', defaultCapacity: '3' },
+  { value: 'Other', label: '✏️ Other (Type Custom Vehicle Class...)', defaultCapacity: '4' },
+];
+
 export function DriverRegisterView() {
   const [entities, setEntities] = useState<PublicEntity[]>([]);
   const [loadingEntities, setLoadingEntities] = useState(true);
@@ -51,7 +66,8 @@ export function DriverRegisterView() {
   const [hasVehicle, setHasVehicle] = useState(true);
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
-  const [vehicleType, setVehicleType] = useState<'Sedan' | 'SUV' | 'Tempo Traveller'>('Sedan');
+  const [vehicleType, setVehicleType] = useState<string>('Sedan');
+  const [customVehicleType, setCustomVehicleType] = useState<string>('');
   const [vehicleCapacity, setVehicleCapacity] = useState('4');
   const [vehicleAc, setVehicleAc] = useState(true);
 
@@ -123,6 +139,15 @@ export function DriverRegisterView() {
       return;
     }
 
+    const finalVehicleType = vehicleType === 'Other'
+      ? customVehicleType.trim()
+      : vehicleType;
+
+    if (hasVehicle && vehicleType === 'Other' && (!customVehicleType.trim() || customVehicleType.trim().length < 2)) {
+      setError('Please type your custom vehicle class (minimum 2 characters).');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
@@ -135,7 +160,7 @@ export function DriverRegisterView() {
         hasVehicle,
         vehicleModel: hasVehicle ? vehicleModel.trim() : undefined,
         vehicleNumber: hasVehicle && vehicleNumber.trim() ? vehicleNumber.trim().toUpperCase() : undefined,
-        vehicleType,
+        vehicleType: finalVehicleType,
         vehicleCapacity: Number(vehicleCapacity) || 4,
         vehicleAc,
       };
@@ -472,7 +497,7 @@ export function DriverRegisterView() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '12px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                         Vehicle Class
@@ -480,17 +505,20 @@ export function DriverRegisterView() {
                       <select
                         value={vehicleType}
                         onChange={(e) => {
-                          const vt = e.target.value as 'Sedan' | 'SUV' | 'Tempo Traveller';
+                          const vt = e.target.value;
                           setVehicleType(vt);
-                          if (vt === 'Sedan') setVehicleCapacity('4');
-                          if (vt === 'SUV') setVehicleCapacity('6');
-                          if (vt === 'Tempo Traveller') setVehicleCapacity('12');
+                          const matched = VEHICLE_CLASS_OPTIONS.find((opt) => opt.value === vt);
+                          if (matched && vt !== 'Other') {
+                            setVehicleCapacity(matched.defaultCapacity);
+                          }
                         }}
                         style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff' }}
                       >
-                        <option value="Sedan">Sedan (Dzire, Etios)</option>
-                        <option value="SUV">SUV (Innova, Ertiga)</option>
-                        <option value="Tempo Traveller">Tempo Traveller (Van)</option>
+                        {VEHICLE_CLASS_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -501,7 +529,7 @@ export function DriverRegisterView() {
                       <input
                         type="number"
                         min="1"
-                        max="50"
+                        max="60"
                         value={vehicleCapacity}
                         onChange={(e) => setVehicleCapacity(e.target.value)}
                         style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', color: '#0f172a', background: '#fff' }}
@@ -522,6 +550,25 @@ export function DriverRegisterView() {
                       </select>
                     </div>
                   </div>
+
+                  {vehicleType === 'Other' && (
+                    <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', padding: '14px 16px', display: 'grid', gap: '6px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#166534' }}>
+                        Specify Custom Vehicle Class *
+                      </label>
+                      <input
+                        type="text"
+                        required={hasVehicle && vehicleType === 'Other'}
+                        placeholder="e.g. Vintage Car, Force Cruiser, Ambulance, Mini Truck, 50-Seater Sleeper Coach"
+                        value={customVehicleType}
+                        onChange={(e) => setCustomVehicleType(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #22c55e', fontSize: '13px', color: '#0f172a', background: '#fff' }}
+                      />
+                      <span style={{ fontSize: '11px', color: '#15803d', lineHeight: 1.4 }}>
+                        Enter your exact vehicle category or body type if it is not in the list above.
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

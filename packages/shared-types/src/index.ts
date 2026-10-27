@@ -24,7 +24,22 @@ export type AssignmentStatus =
   | 'EXPIRED'
   | 'CANCELLED';
 
-export type VehicleType = 'Sedan' | 'SUV' | 'Tempo Traveller';
+export type StandardVehicleType =
+  | 'Hatchback'
+  | 'Sedan'
+  | 'Premium Sedan'
+  | 'SUV'
+  | 'Premium SUV'
+  | 'MUV'
+  | 'Tempo Traveller'
+  | 'Mini Bus'
+  | 'Bus'
+  | 'Luxury'
+  | 'Auto / Rickshaw'
+  | 'Electric Vehicle (EV)'
+  | 'Other';
+
+export type VehicleType = StandardVehicleType | (string & {});
 
 export type TripType = 'ONE_WAY' | 'ROUND_TRIP' | 'MULTI_CITY';
 

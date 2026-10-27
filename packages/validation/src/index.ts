@@ -98,7 +98,7 @@ export const driverSchema = z.object({
 });
 
 export const vehicleSchema = z.object({
-  type: z.enum(['Sedan', 'SUV', 'Tempo Traveller']),
+  type: z.string().trim().min(2, 'Vehicle class must be at least 2 characters').max(50).default('Sedan'),
   number: z.string().trim().min(5, 'Vehicle registration number is required'),
   model: z.string().trim().min(2, 'Model name is required'),
   capacity: z.coerce.number().int().min(1).max(50),
