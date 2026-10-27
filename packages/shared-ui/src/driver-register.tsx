@@ -60,7 +60,6 @@ export function DriverRegisterView() {
   const [phone, setPhone] = useState('');
   const [license, setLicense] = useState('');
   const [baseLocation, setBaseLocation] = useState('');
-  const [serviceRadiusKm, setServiceRadiusKm] = useState('30');
 
   // Vehicle Option
   const [hasVehicle, setHasVehicle] = useState(true);
@@ -156,7 +155,6 @@ export function DriverRegisterView() {
         phone: cleanPhone,
         license: license.trim().toUpperCase(),
         baseLocation: baseLocation.trim(),
-        serviceRadiusKm: Number(serviceRadiusKm) || 30,
         hasVehicle,
         vehicleModel: hasVehicle ? vehicleModel.trim() : undefined,
         vehicleNumber: hasVehicle && vehicleNumber.trim() ? vehicleNumber.trim().toUpperCase() : undefined,
@@ -385,37 +383,19 @@ export function DriverRegisterView() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      Base Location / City *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Kaup, Udupi, Mangaluru, Kundapura"
-                      value={baseLocation}
-                      onChange={(e) => setBaseLocation(e.target.value)}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', color: '#0f172a' }}
-                    />
-                    <small style={{ fontSize: '11px', color: '#64748b' }}>Your primary city or home dispatch hub.</small>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      Service Radius (km)
-                    </label>
-                    <select
-                      value={serviceRadiusKm}
-                      onChange={(e) => setServiceRadiusKm(e.target.value)}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', color: '#0f172a', background: '#fff' }}
-                    >
-                      <option value="20">20 km</option>
-                      <option value="30">30 km</option>
-                      <option value="50">50 km</option>
-                      <option value="100">100 km</option>
-                    </select>
-                  </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Base Location / City *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Kaup, Udupi, Mangaluru, Kundapura"
+                    value={baseLocation}
+                    onChange={(e) => setBaseLocation(e.target.value)}
+                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', color: '#0f172a' }}
+                  />
+                  <small style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>Your primary city or home dispatch hub.</small>
                 </div>
               </div>
             </div>
