@@ -15,6 +15,7 @@ import {
   Sparkles,
   ChevronRight,
   ExternalLink,
+  Camera,
 } from 'lucide-react';
 import { apiClient } from '../../api-client/src/index';
 
@@ -50,6 +51,42 @@ export const VEHICLE_CLASS_OPTIONS = [
   { value: 'Other', label: '✏️ Other (Type Custom Vehicle Class...)', defaultCapacity: '4' },
 ];
 
+async function compressImageFile(file: File, maxWidth = 1000, maxHeight = 750, quality = 0.78): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new (window as any).Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(e.target?.result as string);
+        ctx.drawImage(img, 0, 0, width, height);
+        let dataUrl = canvas.toDataURL('image/webp', quality);
+        if (!dataUrl.startsWith('data:image/webp')) {
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export function DriverRegisterView() {
   const [entities, setEntities] = useState<PublicEntity[]>([]);
   const [loadingEntities, setLoadingEntities] = useState(true);
@@ -69,6 +106,44 @@ export function DriverRegisterView() {
   const [customVehicleType, setCustomVehicleType] = useState<string>('');
   const [vehicleCapacity, setVehicleCapacity] = useState('4');
   const [vehicleAc, setVehicleAc] = useState(true);
+  const [vehicleImages, setVehicleImages] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const remainingSlots = 5 - vehicleImages.length;
+    if (remainingSlots <= 0) {
+      setError('Maximum 5 photos allowed per vehicle.');
+      return;
+    }
+    const toProcess = files.slice(0, remainingSlots);
+    setUploadingImage(true);
+    try {
+      const compressedList = await Promise.all(toProcess.map((f) => compressImageFile(f)));
+      setVehicleImages((prev) => [...prev, ...compressedList]);
+    } catch (err) {
+      setError('Failed to process image: ' + (err as Error).message);
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
+  }
+
+  function handleRemoveImage(index: number) {
+    setVehicleImages((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleSetCover(index: number) {
+    if (index === 0) return;
+    setVehicleImages((prev) => {
+      const list = [...prev];
+      const item = list[index];
+      list.splice(index, 1);
+      list.unshift(item);
+      return list;
+    });
+  }
 
   // Submission State
   const [submitting, setSubmitting] = useState(false);
@@ -161,6 +236,7 @@ export function DriverRegisterView() {
         vehicleType: finalVehicleType,
         vehicleCapacity: Number(vehicleCapacity) || 4,
         vehicleAc,
+        vehicleImages: hasVehicle && vehicleImages.length > 0 ? vehicleImages : undefined,
       };
 
       const res = await apiClient<RegisterResponse>('/public/drivers/register', {
@@ -189,9 +265,19 @@ export function DriverRegisterView() {
           </span>
 
           <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px' }}>Registration Successful!</h2>
-          <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.6, margin: '0 0 24px' }}>
+          <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.6, margin: '0 0 20px' }}>
             Welcome aboard, <strong>{name}</strong>! You are now registered and active as a driver partner with <strong>{submittedResult.entityName}</strong>.
           </p>
+
+          {vehicleImages.length > 0 && (
+            <div style={{ marginBottom: '20px', borderRadius: '12px', overflow: 'hidden', height: '170px', border: '1px solid #e2e8f0', position: 'relative', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
+              <img src={vehicleImages[0]} alt="Registered vehicle cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(15,23,42,0.85))', padding: '10px 14px', color: '#fff', fontSize: '13px', fontWeight: 700, textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{vehicleModel} {vehicleNumber ? `(${vehicleNumber})` : ''}</span>
+                <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '10px' }}>{vehicleImages.length} Photo{vehicleImages.length > 1 ? 's' : ''} Attached</span>
+              </div>
+            </div>
+          )}
 
           <div style={{ background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '18px', textAlign: 'left', marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -549,6 +635,74 @@ export function DriverRegisterView() {
                       </span>
                     </div>
                   )}
+
+                  {/* Vehicle Photos Upload Section */}
+                  <div style={{ marginTop: '12px', padding: '16px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Camera size={16} color="#0284c7" />
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Vehicle Photos</span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>(Optional · Max 5)</span>
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: vehicleImages.length > 0 ? '#ecfdf5' : '#f1f5f9', color: vehicleImages.length > 0 ? '#047857' : '#64748b' }}>
+                        {vehicleImages.length} / 5 Photos
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 12px', lineHeight: 1.5 }}>
+                      Upload photos of your vehicle (Front, Side, Interior, Rear) from your phone gallery or take new photos with your camera.
+                    </p>
+
+                    {vehicleImages.length < 5 && (
+                      <div style={{ marginBottom: vehicleImages.length > 0 ? '12px' : '0' }}>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#0284c7', color: '#ffffff', padding: '10px 16px', borderRadius: '8px', cursor: uploadingImage ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '13px', boxShadow: '0 2px 6px rgba(2, 132, 199, 0.2)' }}>
+                          <Camera size={16} />
+                          {uploadingImage ? 'Compressing & Uploading…' : 'Take / Upload Photos (Camera / Gallery)'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            disabled={uploadingImage}
+                            onChange={handleImageUpload}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    {vehicleImages.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                        {vehicleImages.map((imgSrc, idx) => (
+                          <div key={idx} style={{ position: 'relative', height: '80px', borderRadius: '8px', overflow: 'hidden', border: idx === 0 ? '2px solid #0284c7' : '1px solid #cbd5e1', background: '#0f172a' }}>
+                            <img src={imgSrc} alt={`Vehicle photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            {idx === 0 && (
+                              <span style={{ position: 'absolute', top: 4, left: 4, background: '#0284c7', color: '#ffffff', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px' }}>
+                                ★ Cover
+                              </span>
+                            )}
+                            {idx > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetCover(idx)}
+                                title="Set as Main Cover Photo"
+                                style={{ position: 'absolute', bottom: 4, left: 4, background: 'rgba(15,23,42,0.85)', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '2px 5px', fontSize: '9px', fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                Set Cover
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(idx)}
+                              title="Delete photo"
+                              style={{ position: 'absolute', top: 4, right: 4, background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

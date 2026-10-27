@@ -195,6 +195,7 @@ export interface DriverVehicleDetails {
   type: VehicleType;
   capacity: number;
   ac: boolean;
+  images?: string[];
 }
 
 export interface Driver {
