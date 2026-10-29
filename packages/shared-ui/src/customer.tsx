@@ -327,7 +327,7 @@ export default function CustomerApp() {
                           <>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 10px', flexWrap: 'wrap' }}>
                               <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
-                                ₹{ratePerKm} / km
+                                Direct Route
                               </span>
                               <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
                                 {r.distance} km by road
@@ -335,14 +335,11 @@ export default function CustomerApp() {
                             </div>
                             <div className="section-title" style={{ marginTop: 'auto', paddingTop: 6, alignItems: 'flex-end' }}>
                               <div>
-                                <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
-                                  Fixed All-Inclusive Fare
+                                <div style={{ fontSize: '0.72rem', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                                  Payment Mode
                                 </div>
-                                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                                  {money(r.fixedPrice)}
-                                </div>
-                                <div style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600 }}>
-                                  ({r.distance} km × ₹{ratePerKm}/km)
+                                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                                  Pay After Trip
                                 </div>
                               </div>
                               <span style={{ background: '#f1f5f9', padding: '7px', borderRadius: 8, display: 'inline-flex', color: '#1d5f59' }}>
@@ -446,7 +443,7 @@ export default function CustomerApp() {
                         <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 10px', flexWrap: 'wrap' }}>
                             <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
-                              ₹{ratePerKm} / km
+                              Direct Route
                             </span>
                             <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
                               {r.distance} km by road
@@ -454,14 +451,11 @@ export default function CustomerApp() {
                           </div>
                           <div className="section-title" style={{ marginTop: 'auto', paddingTop: 6, alignItems: 'flex-end' }}>
                             <div>
-                              <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
-                                All-Inclusive Fixed Fare
+                              <div style={{ fontSize: '0.72rem', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                                Payment Mode
                               </div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                                {money(r.fixedPrice)}
-                              </div>
-                              <div style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600 }}>
-                                ({r.distance} km × ₹{ratePerKm}/km)
+                              <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                                Pay After Trip
                               </div>
                             </div>
                             <button
@@ -472,7 +466,7 @@ export default function CustomerApp() {
                                 navigate('home');
                               }}
                             >
-                              Book for {money(r.fixedPrice)}
+                              Book this Route
                             </button>
                           </div>
                         </>
@@ -1019,10 +1013,10 @@ function BookingWizard({
           return (
             <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#166534', fontWeight: 700, fontSize: '0.88rem' }}>
-                <Star size={16} fill="#16a34a" color="#16a34a" /> Popular Route Rate: {matchedRoute.origin} → {matchedRoute.destination}
+                <Star size={16} fill="#16a34a" color="#16a34a" /> Direct Highway Route: {matchedRoute.origin} → {matchedRoute.destination}
               </div>
-              <div style={{ fontWeight: 800, color: '#166534', fontSize: '1.05rem' }}>
-                {money(matchedRoute.fixedPrice)}
+              <div style={{ fontWeight: 600, color: '#166534', fontSize: '0.86rem' }}>
+                {matchedRoute.distance} km by road
               </div>
             </div>
           );
@@ -1067,11 +1061,11 @@ function BookingWizard({
                     </div>
                   </div>
                   <div className="ola-ride-right">
-                    <div className="ola-ride-price">
-                      {money(v.fare ?? 0)}
+                    <div style={{ background: isSelected ? '#0284c7' : '#f1f5f9', color: isSelected ? '#ffffff' : '#0f172a', padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                      {isSelected ? 'Selected ✓' : 'Select'}
                     </div>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>
-                      {estimated ? 'Est. fare' : 'Fixed fare'}
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                      Pay driver
                     </div>
                   </div>
                 </div>
@@ -1136,19 +1130,11 @@ function BookingWizard({
               </div>
             </div>
 
-            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>💵</span>
-                <div>
-                  <strong style={{ color: '#0f172a' }}>Cash or UPI to Driver</strong>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>Pay via Google Pay / PhonePe / Cash when trip completes</div>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 800, fontSize: 16, color: '#0f172a' }}>
-                  {money(quote.fare ?? 0)}
-                </div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Total Fare</div>
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+              <span style={{ fontSize: 22 }}>💵</span>
+              <div>
+                <strong style={{ color: '#0f172a', display: 'block', marginBottom: 2 }}>Cash or UPI to Driver</strong>
+                <div style={{ fontSize: 12, color: '#64748b' }}>Pay directly via Google Pay / PhonePe / Cash after trip completes</div>
               </div>
             </div>
 
