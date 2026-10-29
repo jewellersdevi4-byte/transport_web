@@ -582,6 +582,23 @@
   flex-direction: column;
   gap: 12px;
 }
+.ola-inputs .location-input input {
+  height: 48px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  transition: all 0.2s ease;
+}
+.ola-inputs .location-input input:focus {
+  background: #ffffff;
+  border-color: #0284c7;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
 
 .ola-schedule-box {
   background: #f8fafc;
@@ -667,3 +684,28 @@
 
 
 
+
+/* Responsive Ola/Uber First Layout */
+@media (max-width: 768px) {
+  .hero {
+    display: none !important;
+  }
+  .mobile-hero-app-card {
+    display: none !important;
+  }
+  .booking-panel {
+    margin: 14px 12px 24px !important;
+    padding: 16px 14px !important;
+    border-radius: 16px !important;
+  }
+  .ola-header h2 {
+    font-size: 22px;
+  }
+  .ola-pills-row {
+    margin-bottom: 12px;
+  }
+  .ola-segmented button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}

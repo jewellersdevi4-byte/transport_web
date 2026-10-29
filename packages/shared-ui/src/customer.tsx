@@ -321,34 +321,27 @@ export default function CustomerApp() {
                     </div>
                     <div className="route-body">
                       <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
-                      {(() => {
-                        const ratePerKm = Math.round(r.fixedPrice / Math.max(1, r.distance));
-                        return (
-                          <>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 10px', flexWrap: 'wrap' }}>
-                              <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
-                                Direct Route
-                              </span>
-                              <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
-                                {r.distance} km by road
-                              </span>
-                            </div>
-                            <div className="section-title" style={{ marginTop: 'auto', paddingTop: 6, alignItems: 'flex-end' }}>
-                              <div>
-                                <div style={{ fontSize: '0.72rem', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
-                                  Payment Mode
-                                </div>
-                                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                                  Pay After Trip
-                                </div>
-                              </div>
-                              <span style={{ background: '#f1f5f9', padding: '7px', borderRadius: 8, display: 'inline-flex', color: '#1d5f59' }}>
-                                <ArrowUpRight size={18} />
-                              </span>
-                            </div>
-                          </>
-                        );
-                      })()}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 10px', flexWrap: 'wrap' }}>
+                        <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
+                          Direct Route
+                        </span>
+                        <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                          {r.distance} km by road
+                        </span>
+                      </div>
+                      <div className="section-title" style={{ marginTop: 'auto', paddingTop: 6, alignItems: 'flex-end' }}>
+                        <div>
+                          <div style={{ fontSize: '0.72rem', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                            Payment Mode
+                          </div>
+                          <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                            Pay After Trip
+                          </div>
+                        </div>
+                        <span style={{ background: '#f1f5f9', padding: '7px', borderRadius: 8, display: 'inline-flex', color: '#1d5f59' }}>
+                          <ArrowUpRight size={18} />
+                        </span>
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -437,41 +430,34 @@ export default function CustomerApp() {
                   </div>
                   <div className="route-body">
                     <h3>{r.origin} <ArrowRight size={17} /> {r.destination}</h3>
-                    {(() => {
-                      const ratePerKm = Math.round(r.fixedPrice / Math.max(1, r.distance));
-                      return (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 10px', flexWrap: 'wrap' }}>
-                            <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
-                              Direct Route
-                            </span>
-                            <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
-                              {r.distance} km by road
-                            </span>
-                          </div>
-                          <div className="section-title" style={{ marginTop: 'auto', paddingTop: 6, alignItems: 'flex-end' }}>
-                            <div>
-                              <div style={{ fontSize: '0.72rem', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
-                                Payment Mode
-                              </div>
-                              <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                                Pay After Trip
-                              </div>
-                            </div>
-                            <button
-                              className="primary small"
-                              onClick={() => {
-                                window.dispatchEvent(new CustomEvent('choose-route', { detail: r }));
-                                setActiveTab('book');
-                                navigate('home');
-                              }}
-                            >
-                              Book this Route
-                            </button>
-                          </div>
-                        </>
-                      );
-                    })()}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '6px 0 10px', flexWrap: 'wrap' }}>
+                      <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
+                        Direct Route
+                      </span>
+                      <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                        {r.distance} km by road
+                      </span>
+                    </div>
+                    <div className="section-title" style={{ marginTop: 'auto', paddingTop: 6, alignItems: 'flex-end' }}>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                          Payment Mode
+                        </div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                          Pay After Trip
+                        </div>
+                      </div>
+                      <button
+                        className="primary small"
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('choose-route', { detail: r }));
+                          setActiveTab('book');
+                          navigate('home');
+                        }}
+                      >
+                        Book this Route
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -534,6 +520,12 @@ export default function CustomerApp() {
   );
 }
 
+const DEFAULT_CABS: Quote[] = [
+  { id: 'cat-sedan', type: 'Sedan', model: 'Dzire, Etios or equivalent', capacity: 4, ac: true, rating: 4.9, status: 'Available' },
+  { id: 'cat-suv', type: 'SUV', model: 'Ertiga, Innova or equivalent', capacity: 6, ac: true, rating: 4.9, status: 'Available' },
+  { id: 'cat-tempo', type: 'Tempo Traveller', model: 'Force Traveller Luxury', capacity: 12, ac: true, rating: 4.8, status: 'Available' },
+];
+
 function BookingWizard({
   token,
   onLogin,
@@ -581,7 +573,7 @@ function BookingWizard({
   const [extraHours, setExtraHours] = useState(0);
   const [step, setStep] = useState(0);
   const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(DEFAULT_CABS[0]);
   const [directBooking, setDirectBooking] = useState(true);
   const [estimated, setEstimated] = useState(true);
   const [error, setError] = useState('');
@@ -621,7 +613,7 @@ function BookingWizard({
   );
   const routeRequest = JSON.stringify(search);
   useEffect(() => {
-    setDistance(null); setDistanceError(''); setCalculating(false); setQuotes([]); setQuote(null);
+    setDistance(null); setDistanceError(''); setCalculating(false); setQuotes([]); setQuote((prev) => prev || DEFAULT_CABS[0]);
     if (!routeReady) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
@@ -691,6 +683,8 @@ function BookingWizard({
       setQuotes(r.vehicles);
       if (r.vehicles.length > 0) {
         setQuote(r.vehicles[0]);
+      } else {
+        setQuote((prev) => prev || DEFAULT_CABS[0]);
       }
       setEstimated(r.estimated);
       setDistance(dist ?? r.distance);
@@ -724,8 +718,8 @@ function BookingWizard({
           pickupPlaceId: search.pickupPlaceId || undefined,
           dropPlaceId: search.dropPlaceId || undefined,
           ...details,
-          vehicleType: quote?.type,
-          vehicleId: quote?.id,
+          vehicleType: (quote?.type || 'Sedan') as any,
+          vehicleId: quote?.id?.startsWith('cat-') ? undefined : quote?.id,
           idempotencyKey: key,
         },
       });
@@ -741,6 +735,14 @@ function BookingWizard({
 
   async function book(e: React.FormEvent) {
     e.preventDefault();
+    if (!search.pickup.trim()) {
+      setError('Please enter your pickup location.');
+      return;
+    }
+    if (!search.drop.trim()) {
+      setError('Please enter your destination.');
+      return;
+    }
     if (!details.name.trim()) {
       setError('Please enter your full name.');
       return;
@@ -874,7 +876,7 @@ function BookingWizard({
       <div className="ola-booking-container">
         <div className="ola-header">
           <h2>Where to?</h2>
-          <p>Book instant cabs & outstation rides with upfront fares</p>
+          <p>Instant city cabs & outstation rides with verified commercial chauffeurs</p>
         </div>
 
         {error && <ErrorBox message={error} />}
@@ -972,6 +974,7 @@ function BookingWizard({
                   value={search.pickup}
                   placeId={search.pickupPlaceId}
                   placeholder="Enter pickup location"
+                  showGps={true}
                   onChange={(value, placeId) => {
                     setSearch((s) => ({ ...s, pickup: value, pickupPlaceId: placeId }));
                   }}
@@ -1009,7 +1012,6 @@ function BookingWizard({
               (r.destination.toLowerCase() === dNorm || dNorm.includes(r.destination.toLowerCase()))
           );
           if (!matchedRoute) return null;
-          const ratePerKm = Math.round(matchedRoute.fixedPrice / Math.max(1, matchedRoute.distance));
           return (
             <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#166534', fontWeight: 700, fontSize: '0.88rem' }}>
@@ -1022,150 +1024,153 @@ function BookingWizard({
           );
         })()}
 
-        {routeReady && quotes.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Available Cabs
-            </div>
-            {quotes.map((v) => {
-              const isSelected = quote?.id === v.id;
-              return (
-                <div
-                  key={v.id}
-                  className={`ola-ride-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => setQuote(v)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="ola-ride-left">
-                    <div className="ola-ride-thumb">
-                      {v.images && v.images.length > 0 ? (
-                        <img src={v.images[0]} alt={v.model} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <Car size={28} color="#475569" />
-                      )}
-                    </div>
-                    <div className="ola-ride-info">
-                      <h4>{v.model || v.type} <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>· {v.type}</span></h4>
-                      <p>
-                        <span><Users size={12} style={{ verticalAlign: 'middle', marginRight: 2 }} /> {v.capacity} seats</span>
-                        <span style={{ margin: '0 6px' }}>•</span>
-                        <span>{v.ac ? 'AC' : 'Non-AC'}</span>
-                        {v.rating ? (
-                          <>
-                            <span style={{ margin: '0 6px' }}>•</span>
-                            <span style={{ color: '#d97706', fontWeight: 600 }}>★ {v.rating.toFixed(1)}</span>
-                          </>
-                        ) : null}
-                      </p>
-                    </div>
+        {/* Cabs List (Live or Available Categories) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {quotes.length > 0 ? 'Live Available Cabs' : 'Select Cab Category'}
+            </span>
+            <span style={{ fontSize: 12, color: '#047857', fontWeight: 600 }}>
+              ✓ Pay Cash / UPI After Trip
+            </span>
+          </div>
+
+          {(quotes.length > 0 ? quotes : DEFAULT_CABS).map((v) => {
+            const isSelected = (quote?.type || 'Sedan') === v.type;
+            return (
+              <div
+                key={v.id}
+                className={`ola-ride-card ${isSelected ? 'selected' : ''}`}
+                onClick={() => setQuote(v)}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="ola-ride-left">
+                  <div className="ola-ride-thumb">
+                    {v.images && v.images.length > 0 ? (
+                      <img src={v.images[0]} alt={v.model} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <Car size={26} color="#0284c7" />
+                    )}
                   </div>
-                  <div className="ola-ride-right">
-                    <div style={{ background: isSelected ? '#0284c7' : '#f1f5f9', color: isSelected ? '#ffffff' : '#0f172a', padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
-                      {isSelected ? 'Selected ✓' : 'Select'}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                      Pay driver
-                    </div>
+                  <div className="ola-ride-info">
+                    <h4>{v.model || v.type} <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>· {v.type}</span></h4>
+                    <p>
+                      <span><Users size={12} style={{ verticalAlign: 'middle', marginRight: 2 }} /> {v.capacity} seats</span>
+                      <span style={{ margin: '0 6px' }}>•</span>
+                      <span>{v.ac ? 'AC Cab' : 'Non-AC'}</span>
+                      {v.rating ? (
+                        <>
+                          <span style={{ margin: '0 6px' }}>•</span>
+                          <span style={{ color: '#d97706', fontWeight: 600 }}>★ {v.rating.toFixed(1)}</span>
+                        </>
+                      ) : null}
+                    </p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div className="ola-ride-right">
+                  <div style={{
+                    background: isSelected ? '#0284c7' : '#f1f5f9',
+                    color: isSelected ? '#ffffff' : '#0f172a',
+                    padding: '6px 14px',
+                    borderRadius: 20,
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}>
+                    {isSelected ? 'Selected ✓' : 'Select'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    Pay after trip
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-        {routeReady && quotes.length === 0 && !busy && !calculating && (
-          <div style={{ padding: '24px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: 12, marginTop: 12 }}>
-            <Car size={32} color="#94a3b8" style={{ marginBottom: 8 }} />
-            <p style={{ fontWeight: 600, color: '#1e293b', margin: '0 0 4px' }}>No vehicles currently available</p>
-            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Try choosing a different time or contact dispatch for assistance.</p>
-          </div>
-        )}
-
-        {(busy || calculating) && routeReady && quotes.length === 0 && (
-          <div style={{ padding: '20px 16px', textAlign: 'center', color: '#64748b', fontSize: 14 }}>
-            Finding nearby available cabs…
-          </div>
-        )}
-
-        {quote && (
-          <form onSubmit={book} className="ola-confirm-box">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
-                Rider Details
-              </h3>
-              <span style={{ fontSize: 12, background: '#ecfdf5', color: '#047857', padding: '3px 8px', borderRadius: 12, fontWeight: 600 }}>
-                ✓ Pay Driver After Trip
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
-                  Your Name
-                </label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. Rahul Sharma"
-                  value={details.name}
-                  onChange={(e) => setDetails({ ...details, name: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
-                />
+        {/* Rider Details & Booking Box */}
+        <form onSubmit={book} className="ola-confirm-box">
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Car size={18} color="#0284c7" />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
-                  Mobile Number (10 digits)
-                </label>
-                <input
-                  required
-                  type="tel"
-                  pattern="[6-9][0-9]{9}"
-                  maxLength={10}
-                  placeholder="e.g. 9876543210"
-                  value={details.phone}
-                  onChange={(e) => setDetails({ ...details, phone: e.target.value.replace(/\D/g, '') })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
-                />
+                <strong style={{ color: '#0f172a', fontSize: 14 }}>Selected: {quote?.model || quote?.type || 'Sedan'}</strong>
+                <div style={{ fontSize: 12, color: '#64748b' }}>{quote?.capacity || 4} passenger seats • Sanitized AC Cab</div>
               </div>
             </div>
+            <span style={{ fontSize: 12, background: '#ecfdf5', color: '#047857', padding: '4px 10px', borderRadius: 12, fontWeight: 700 }}>
+              ✓ Pay Driver After Trip
+            </span>
+          </div>
 
-            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-              <span style={{ fontSize: 22 }}>💵</span>
-              <div>
-                <strong style={{ color: '#0f172a', display: 'block', marginBottom: 2 }}>Cash or UPI to Driver</strong>
-                <div style={{ fontSize: 12, color: '#64748b' }}>Pay directly via Google Pay / PhonePe / Cash after trip completes</div>
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 5 }}>
+                Your Name *
+              </label>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Rahul Sharma"
+                value={details.name}
+                onChange={(e) => setDetails({ ...details, name: e.target.value })}
+                style={{ width: '100%', height: 44, padding: '0 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
+              />
             </div>
-
-            <button
-              type="submit"
-              className="primary full"
-              disabled={busy || !details.name.trim() || details.phone.replace(/\D/g, '').length !== 10}
-              style={{
-                width: '100%',
-                padding: '14px',
-                fontSize: 16,
-                fontWeight: 700,
-                borderRadius: 10,
-                background: '#0284c7',
-                color: '#ffffff',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-            >
-              {busy ? 'Booking ride…' : `Confirm & Book ${quote.model || quote.type}`} <ArrowRight size={18} />
-            </button>
-
-            <div style={{ textAlign: 'center', marginTop: 10, fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <ShieldCheck size={14} color="#16a34a" /> Free cancellation • Professional drivers • Sanitized AC cabs
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 5 }}>
+                Mobile Number (10 digits) *
+              </label>
+              <input
+                required
+                type="tel"
+                pattern="[6-9][0-9]{9}"
+                maxLength={10}
+                placeholder="e.g. 9876543210"
+                value={details.phone}
+                onChange={(e) => setDetails({ ...details, phone: e.target.value.replace(/\D/g, '') })}
+                style={{ width: '100%', height: 44, padding: '0 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
+              />
             </div>
-          </form>
-        )}
+          </div>
+
+          <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+            <span style={{ fontSize: 22 }}>💵</span>
+            <div>
+              <strong style={{ color: '#0f172a', display: 'block', marginBottom: 2 }}>Cash or UPI to Driver</strong>
+              <div style={{ fontSize: 12, color: '#64748b' }}>Pay directly via Google Pay / PhonePe / Cash when trip completes</div>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="primary full"
+            disabled={busy}
+            style={{
+              width: '100%',
+              padding: '14px',
+              fontSize: 16,
+              fontWeight: 700,
+              borderRadius: 12,
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            {busy ? 'Securing reservation…' : `Confirm & Book ${quote?.type || 'Ride'} Now`} <ArrowRight size={18} />
+          </button>
+
+          <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <ShieldCheck size={14} color="#16a34a" /> Free cancellation • Professional drivers • Sanitized AC fleet
+          </div>
+        </form>
       </div>
 
       {otpModal && (

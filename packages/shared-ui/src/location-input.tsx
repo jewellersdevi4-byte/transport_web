@@ -226,8 +226,8 @@ function MapPickerModal({
   );
 }
 
-export function LocationInput({ value, placeId, onChange, placeholder }: {
-  value: string; placeId?: string; onChange: (value: string, placeId: string) => void; placeholder: string;
+export function LocationInput({ value, placeId, onChange, placeholder, showGps = false }: {
+  value: string; placeId?: string; onChange: (value: string, placeId: string) => void; placeholder: string; showGps?: boolean;
 }) {
   const id = useId();
   const [items, setItems] = useState<Place[]>([]);
@@ -339,36 +339,68 @@ export function LocationInput({ value, placeId, onChange, placeholder }: {
   }
 
   return (
-    <div className="location-input" onBlur={handleBlur}>
-      <input
-        required
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={open && !placeId}
-        aria-controls={`${id}-list`}
-        aria-activedescendant={active >= 0 ? `${id}-${active}` : undefined}
-        autoComplete="off"
-        minLength={2}
-        maxLength={2000}
-        placeholder={placeholder}
-        value={value}
-        onFocus={() => setOpen(true)}
-        onChange={e => { onChange(e.target.value, ''); setSelectedProvider(undefined); setOpen(true); }}
-        onKeyDown={e => {
-          if (e.key === 'Escape') setOpen(false);
-          if (items.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-            e.preventDefault();
-            setActive(i => (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length);
-          }
-          if (open && e.key === 'Enter' && active >= 0 && items[active]) {
-            e.preventDefault();
-            select(items[active]);
-          } else if (open && e.key === 'Enter' && items.length > 0) {
-            e.preventDefault();
-            select(items[0]);
-          }
-        }}
-      />
+    <div className="location-input" onBlur={handleBlur} style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', width: '100%' }}>
+        <input
+          required
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open && !placeId}
+          aria-controls={`${id}-list`}
+          aria-activedescendant={active >= 0 ? `${id}-${active}` : undefined}
+          autoComplete="off"
+          minLength={2}
+          maxLength={2000}
+          placeholder={placeholder}
+          value={value}
+          onFocus={() => setOpen(true)}
+          onChange={e => { onChange(e.target.value, ''); setSelectedProvider(undefined); setOpen(true); }}
+          onKeyDown={e => {
+            if (e.key === 'Escape') setOpen(false);
+            if (items.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+              e.preventDefault();
+              setActive(i => (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length);
+            }
+            if (open && e.key === 'Enter' && active >= 0 && items[active]) {
+              e.preventDefault();
+              select(items[active]);
+            } else if (open && e.key === 'Enter' && items.length > 0) {
+              e.preventDefault();
+              select(items[0]);
+            }
+          }}
+          style={{ width: '100%', paddingRight: showGps ? 40 : 12 }}
+        />
+        {showGps && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              useCurrentLocation();
+            }}
+            disabled={locating}
+            title="Auto-detect current GPS location"
+            style={{
+              position: 'absolute',
+              right: 10,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              cursor: locating ? 'wait' : 'pointer',
+              color: locating ? '#0284c7' : '#64748b',
+              padding: 4,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 6,
+            }}
+          >
+            <LocateFixed size={18} />
+          </button>
+        )}
+      </div>
 
       {error && !open && <small role="alert" className="location-current-error">{error}</small>}
 
