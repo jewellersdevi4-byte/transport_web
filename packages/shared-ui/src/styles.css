@@ -475,4 +475,195 @@
   }
 }
 
+/* ==========================================================================
+   Ola / Uber Style Customer Experience
+   ========================================================================== */
+.ola-booking-container {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.ola-header {
+  margin-bottom: 20px;
+}
+.ola-header h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+.ola-header p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.ola-pills-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.ola-segmented {
+  display: inline-flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  gap: 4px;
+}
+.ola-segmented button {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 7px;
+  color: #64748b;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ola-segmented button.active {
+  background: #ffffff;
+  color: #0284c7;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.ola-route-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  margin-bottom: 16px;
+}
+
+.ola-route-track {
+  display: flex;
+  gap: 12px;
+  position: relative;
+}
+
+.ola-pins {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  width: 16px;
+}
+.ola-pin-green {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+.ola-pin-line {
+  width: 2px;
+  flex: 1;
+  background: #cbd5e1;
+  margin: 4px 0;
+}
+.ola-pin-red {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.ola-inputs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ola-schedule-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 500px) {
+  .ola-schedule-box {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ola-ride-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 2px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 10px;
+}
+.ola-ride-card:hover {
+  border-color: #93c5fd;
+  background: #f8fafc;
+}
+.ola-ride-card.selected {
+  border-color: #0284c7;
+  background: #f0f9ff;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.12);
+}
+
+.ola-ride-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ola-ride-thumb {
+  width: 60px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #f1f5f9;
+}
+.ola-ride-info h4 {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 2px;
+}
+.ola-ride-info p {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+.ola-ride-right {
+  text-align: right;
+}
+.ola-ride-price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.ola-ride-card.selected .ola-ride-price {
+  color: #0284c7;
+}
+
+.ola-confirm-box {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px 18px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
+  margin-top: 18px;
+}
+
+
 

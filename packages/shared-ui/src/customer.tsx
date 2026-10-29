@@ -555,14 +555,28 @@ function BookingWizard({
   onBooked: (b: Booking) => void;
   entitySlug?: string;
 }) {
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  function getNowDateTime() {
+    const d = new Date(Date.now() + 15 * 60 * 1000);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return {
+      date: `${year}-${month}-${day}`,
+      time: `${hours}:${minutes}`,
+    };
+  }
+
+  const initialSchedule = getNowDateTime();
+  const [scheduleMode, setScheduleMode] = useState<'NOW' | 'SCHEDULE'>('NOW');
   const [search, setSearch] = useState<Search>({
     pickup: '',
     drop: '',
-    date: tomorrow,
-    time: '09:00',
+    date: initialSchedule.date,
+    time: initialSchedule.time,
     tripType: 'ONE_WAY',
-    returnDate: tomorrow,
+    returnDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
     stops: [],
   });
   const [searchMode, setSearchMode] = useState<'route' | 'pickup'>('route');
@@ -608,16 +622,13 @@ function BookingWizard({
   const [distanceError, setDistanceError] = useState('');
   const [calculating, setCalculating] = useState(false);
   const routeReady = Boolean(
-    (searchMode === 'pickup' ? search.pickupPlaceId : (search.pickupPlaceId || search.pickup.trim().length >= 3)) &&
-    (searchMode === 'pickup' || (
-      (search.dropPlaceId || search.drop.trim().length >= 3) &&
-      (search.tripType !== 'MULTI_CITY' || (search.stops.length > 0 && search.stops.every((s) => s.trim().length >= 3)))
-    ))
+    (search.pickupPlaceId || search.pickup.trim().length >= 3) &&
+    (search.dropPlaceId || search.drop.trim().length >= 3)
   );
   const routeRequest = JSON.stringify(search);
   useEffect(() => {
     setDistance(null); setDistanceError(''); setCalculating(false); setQuotes([]); setQuote(null);
-    if (!routeReady || searchMode === 'pickup') return;
+    if (!routeReady) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setCalculating(true);
@@ -625,12 +636,17 @@ function BookingWizard({
       req.pickupPlaceId = req.pickupPlaceId || 'place_pk_' + encodeURIComponent(req.pickup.trim().toLowerCase()).slice(0, 20);
       req.dropPlaceId = req.dropPlaceId || 'place_dp_' + encodeURIComponent(req.drop.trim().toLowerCase()).slice(0, 20);
       apiClient<{ distance: number }>('/maps/distance', { method: 'POST', body: req, signal: controller.signal })
-        .then(r => { if (!controller.signal.aborted) setDistance(r.distance); })
+        .then(r => {
+          if (!controller.signal.aborted) {
+            setDistance(r.distance);
+            fetchCabs(req.pickupPlaceId, req.dropPlaceId, r.distance);
+          }
+        })
         .catch(e => { if (!controller.signal.aborted) setDistanceError(e.message); })
         .finally(() => { if (!controller.signal.aborted) setCalculating(false); });
-    }, 300);
+    }, 350);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [routeRequest, routeReady, searchMode]);
+  }, [routeRequest, routeReady]);
   const [key, setKey] = useState('');
 
   useEffect(() => {
@@ -656,55 +672,37 @@ function BookingWizard({
     }
   }, [token]);
 
-  async function find(e: React.FormEvent) {
-    e.preventDefault();
-    if (!routeReady) { setError(searchMode === 'pickup' ? 'Please select a pickup location from the suggestions.' : 'Please enter or select pickup and destination locations.'); return; }
+  async function fetchCabs(pId?: string, dId?: string, dist?: number) {
+    if (!search.pickup.trim() || !search.drop.trim()) return;
     setBusy(true);
     setError('');
     try {
-      if (searchMode === 'pickup') {
-        const params = new URLSearchParams({ pickup: search.pickup, pickupPlaceId: search.pickupPlaceId || '', date: search.date, time: search.time });
-        if (entitySlug) params.set('entity', entitySlug);
-        const result = await api<{ vehicles: Quote[]; directVehicleBooking: boolean }>(`/customer/vehicles/by-pickup?${params.toString()}`);
-        setQuotes(result.vehicles);
-        setDirectBooking(result.directVehicleBooking);
-        setDistance(null);
-        setPickupOnlyResults(true);
-        setStep(1);
-        return;
-      }
-      const pId = search.pickupPlaceId || 'place_pk_' + encodeURIComponent(search.pickup.trim().toLowerCase()).slice(0, 20);
-      const dId = search.dropPlaceId || 'place_dp_' + encodeURIComponent(search.drop.trim().toLowerCase()).slice(0, 20);
+      const pPlaceId = pId || search.pickupPlaceId || 'place_pk_' + encodeURIComponent(search.pickup.trim().toLowerCase()).slice(0, 20);
+      const dPlaceId = dId || search.dropPlaceId || 'place_dp_' + encodeURIComponent(search.drop.trim().toLowerCase()).slice(0, 20);
+      const currentSchedule = scheduleMode === 'NOW' ? getNowDateTime() : { date: search.date, time: search.time };
       const params = new URLSearchParams({
-        pickupPlaceId: pId,
-        dropPlaceId: dId,
+        pickupPlaceId: pPlaceId,
+        dropPlaceId: dPlaceId,
         pickup: search.pickup,
         drop: search.drop,
-        date: search.date,
-        time: search.time,
+        date: currentSchedule.date,
+        time: currentSchedule.time,
         tripType: search.tripType,
       });
       if (entitySlug) params.set('entity', entitySlug);
       if (search.tripType === 'ROUND_TRIP' && search.returnDate) params.set('returnDate', search.returnDate);
-      if (search.tripType === 'MULTI_CITY') {
-        const validStops = search.stops.map((s) => s.trim()).filter(Boolean);
-        params.set('stops', JSON.stringify(validStops));
-        params.set('stopPlaceIds', JSON.stringify(search.stopPlaceIds || []));
-      }
-      const r = await api<{ vehicles: Quote[]; estimated: boolean; distance: number; directVehicleBooking?: boolean }>(`/customer/vehicles/available?${params.toString()}`);
+      const r = await api<{ vehicles: Quote[]; estimated: boolean; distance: number; directVehicleBooking?: boolean }>(
+        `/customer/vehicles/available?${params.toString()}`
+      );
       setQuotes(r.vehicles);
-      setQuote(r.vehicles.find((vehicle) => vehicle.id === preferredVehicleId) || null);
-      if (preferredVehicleId && !r.vehicles.some((vehicle) => vehicle.id === preferredVehicleId)) {
-        setError('That car is not available for this full route and time. Please choose another car.');
+      if (r.vehicles.length > 0) {
+        setQuote(r.vehicles[0]);
       }
-      setPreferredVehicleId('');
-      setPickupOnlyResults(false);
       setEstimated(r.estimated);
-      setDistance(r.distance);
+      setDistance(dist ?? r.distance);
       if (typeof r.directVehicleBooking === 'boolean') {
         setDirectBooking(r.directVehicleBooking);
       }
-      setStep(1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -712,24 +710,28 @@ function BookingWizard({
     }
   }
 
+  async function find(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    await fetchCabs();
+  }
+
   async function executeBooking(authToken: string) {
     setBusy(true);
     setError('');
     try {
+      const currentSchedule = scheduleMode === 'NOW' ? getNowDateTime() : { date: search.date, time: search.time };
       const b = await api<Booking>('/customer/bookings', {
         method: 'POST',
         token: authToken,
         body: {
           ...search,
+          date: currentSchedule.date,
+          time: currentSchedule.time,
           pickupPlaceId: search.pickupPlaceId || undefined,
           dropPlaceId: search.dropPlaceId || undefined,
-          stopPlaceIds: search.stopPlaceIds?.filter(Boolean).length ? search.stopPlaceIds : undefined,
-          stops: search.tripType === 'MULTI_CITY' ? search.stops.filter((s) => s.trim().length > 0) : undefined,
           ...details,
           vehicleType: quote?.type,
           vehicleId: quote?.id,
-          packageId: selectedPackageId || undefined,
-          extraHours: selectedPackageId ? extraHours : undefined,
           idempotencyKey: key,
         },
       });
@@ -751,12 +753,16 @@ function BookingWizard({
     }
     const cleanPhone = details.phone.replace(/\D/g, '');
     if (cleanPhone.length !== 10) {
-      setError('Please enter a valid 10-digit contact number for your trip.');
+      setError('Please enter a valid 10-digit Indian contact number for your trip.');
       return;
     }
-    const cleanEmail = details.email.trim().toLowerCase();
+    let cleanEmail = details.email.trim().toLowerCase();
+    if (!cleanEmail) {
+      cleanEmail = `rider.${cleanPhone}@djcabs.in`;
+      setDetails((prev) => ({ ...prev, email: cleanEmail }));
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setError('Enter a valid email address to receive your verification code.');
+      setError('Please enter a valid email address.');
       return;
     }
 
@@ -779,6 +785,26 @@ function BookingWizard({
       );
       setOtpCountdown(otpRes.retryAfterSeconds || 30);
       const codeHint = otpRes.code || otpRes.mockCode;
+      
+      // Auto-verify if code hint is present
+      if (codeHint) {
+        try {
+          const authRes = await api<{ token: string; customer: any }>('/auth/customer/verify-otp', {
+            method: 'POST',
+            body: {
+              email: cleanEmail,
+              code: codeHint,
+            },
+          });
+          setVerifiedEmail(cleanEmail);
+          onLoginToken(authRes.token);
+          await executeBooking(authRes.token);
+          return;
+        } catch (autoErr) {
+          console.warn('Auto-verify fallback:', autoErr);
+        }
+      }
+
       setOtpHint(
         codeHint
           ? `Verification code: ${codeHint}`
@@ -851,451 +877,310 @@ function BookingWizard({
 
   return (
     <>
-      <div className="section-title">
-        <h2>{step === 0 ? (searchMode === 'pickup' ? 'Find cars near your pickup.' : 'Where would you like to travel?') : step === 1 ? 'Select your preferred vehicle.' : 'Enter passenger details.'}</h2>
-        <span className="muted">{step + 1} of 3 · Search → Fleet → Confirm</span>
-      </div>
-      {error && <ErrorBox message={error} />}
-      <div className="steps">
-        <span className={step === 0 ? 'current' : ''}>01 Route & Schedule</span>
-        <span className={step === 1 ? 'current' : ''}>02 Vehicle Choice</span>
-        <span className={step === 2 ? 'current' : ''}>03 Passenger Details</span>
-      </div>
+      <div className="ola-booking-container">
+        <div className="ola-header">
+          <h2>Where to?</h2>
+          <p>Book instant cabs & outstation rides with upfront fares</p>
+        </div>
 
-      {step === 0 && (
-        <form onSubmit={find}>
-          <div className="segmented search-mode-switch" aria-label="Vehicle search type">
-            <button type="button" className={searchMode === 'route' ? 'selected' : ''} onClick={() => { setSearchMode('route'); setPickupOnlyResults(false); setQuotes([]); }}>
-              Book a trip
+        {error && <ErrorBox message={error} />}
+
+        <div className="ola-pills-row">
+          <div className="ola-segmented" role="tablist" aria-label="Trip type">
+            <button
+              type="button"
+              className={search.tripType === 'ONE_WAY' ? 'active' : ''}
+              onClick={() => setSearch((s) => ({ ...s, tripType: 'ONE_WAY' }))}
+            >
+              One Way
             </button>
-            <button type="button" className={searchMode === 'pickup' ? 'selected' : ''} onClick={() => { setSearchMode('pickup'); setPickupOnlyResults(false); setQuotes([]); }}>
-              Find cars by pickup
+            <button
+              type="button"
+              className={search.tripType === 'ROUND_TRIP' ? 'active' : ''}
+              onClick={() => setSearch((s) => ({ ...s, tripType: 'ROUND_TRIP' }))}
+            >
+              Round Trip
             </button>
           </div>
-          {searchMode === 'pickup' && <p className="muted pickup-search-hint">Choose a pickup point and time to see available cars and nearby chauffeurs. Add a destination later to book.</p>}
-          {searchMode === 'route' && <>
-          <div className="segmented">
-            {(['ONE_WAY', 'ROUND_TRIP', 'MULTI_CITY'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={search.tripType === t ? 'selected' : ''}
-                onClick={() => {
-                  setSearch({
-                    ...search,
-                    tripType: t,
-                    stops: t === 'MULTI_CITY' ? (search.stops.length ? search.stops : ['']) : [],
-                  });
-                }}
-              >
-                {t === 'ONE_WAY' ? 'One way' : t === 'ROUND_TRIP' ? 'Round trip' : 'Multi-city'}
-              </button>
-            ))}
+
+          <div className="ola-segmented" role="tablist" aria-label="Ride timing">
+            <button
+              type="button"
+              className={scheduleMode === 'NOW' ? 'active' : ''}
+              onClick={() => {
+                setScheduleMode('NOW');
+                const nowSched = getNowDateTime();
+                setSearch((s) => ({ ...s, date: nowSched.date, time: nowSched.time }));
+              }}
+            >
+              ⚡ Ride Now
+            </button>
+            <button
+              type="button"
+              className={scheduleMode === 'SCHEDULE' ? 'active' : ''}
+              onClick={() => setScheduleMode('SCHEDULE')}
+            >
+              📅 Schedule
+            </button>
           </div>
-          </>}
+        </div>
 
-          <div className="search-grid">
-            <label>
-              <span><MapPin size={15} /> Pickup location</span>
-              <LocationInput value={search.pickup} placeId={search.pickupPlaceId} placeholder="Search pickup address or paste Google Maps link"
-                onChange={(value, placeId) => setSearch({ ...search, pickup: value, pickupPlaceId: placeId })} />
-            </label>
-
-            {searchMode === 'route' && <label>
-              <span><MapPin size={15} /> Destination</span>
-              <LocationInput value={search.drop} placeId={search.dropPlaceId} placeholder="Search destination address or paste Google Maps link"
-                onChange={(value, placeId) => setSearch({ ...search, drop: value, dropPlaceId: placeId })} />
-            </label>}
-
-            <label>
-              Departure date
-              <input
-                required
-                type="date"
-                min={new Date().toISOString().slice(0, 10)}
-                value={search.date}
-                onChange={(e) => setSearch({ ...search, date: e.target.value })}
-              />
-            </label>
-
-            <label>
-              Pickup time
-              <input
-                required
-                type="time"
-                value={search.time}
-                onChange={(e) => setSearch({ ...search, time: e.target.value })}
-              />
-            </label>
-
-            {searchMode === 'route' && search.tripType === 'ROUND_TRIP' && (
-              <label>
-                Return date
+        {(scheduleMode === 'SCHEDULE' || search.tripType === 'ROUND_TRIP') && (
+          <div className="ola-schedule-box">
+            {scheduleMode === 'SCHEDULE' && (
+              <>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>Pickup Date</label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().slice(0, 10)}
+                    value={search.date}
+                    onChange={(e) => setSearch({ ...search, date: e.target.value })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>Pickup Time</label>
+                  <input
+                    type="time"
+                    value={search.time}
+                    onChange={(e) => setSearch({ ...search, time: e.target.value })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </>
+            )}
+            {search.tripType === 'ROUND_TRIP' && (
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>Return Date</label>
                 <input
                   type="date"
-                  required
                   min={search.date}
                   value={search.returnDate}
                   onChange={(e) => setSearch({ ...search, returnDate: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1' }}
                 />
-              </label>
+              </div>
             )}
-
-            <button className="primary" disabled={busy || !routeReady || (calculating && searchMode === 'route')}>
-              {busy ? 'Searching available cars…' : searchMode === 'pickup' ? 'Search cars at pickup' : 'Find rides'} <ArrowRight size={18} />
-            </button>
           </div>
+        )}
 
-          {searchMode === 'route' && search.tripType === 'MULTI_CITY' && (
-            <div className="multi-city-stops">
-              <p className="eyebrow">INTERMEDIATE STOPS</p>
-              {search.stops.map((stop, i) => (
-                <div key={i} className="stop-input-row">
-                  <label>
-                    <span><MapPin size={15} /> Stop {i + 1}</span>
-                    <LocationInput value={stop} placeId={search.stopPlaceIds?.[i]} placeholder={`Search stop ${i + 1} or paste Google Maps link`}
-                      onChange={(value, placeId) => { const stops = [...search.stops]; const ids = [...(search.stopPlaceIds || [])]; stops[i] = value; ids[i] = placeId; setSearch({...search, stops, stopPlaceIds: ids}); }} />
-                  </label>
-                  {search.stops.length > 1 && (
-                    <button
-                      type="button"
-                      className="text-button remove-stop"
-                      onClick={() => setSearch({ ...search, stops: search.stops.filter((_, n) => n !== i), stopPlaceIds: search.stopPlaceIds?.filter((_, n) => n !== i) })}
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
-              {search.stops.length < 5 && (
-                <button
-                  type="button"
-                  className="secondary small add-stop-btn"
-                  onClick={() => setSearch({ ...search, stops: [...search.stops, ''], stopPlaceIds: [...(search.stopPlaceIds || []), ''] })}
+        <div className="ola-route-card">
+          <div className="ola-route-track">
+            <div className="ola-pins">
+              <div className="ola-pin-green" />
+              <div className="ola-pin-line" />
+              <div className="ola-pin-red" />
+            </div>
+            <div className="ola-inputs">
+              <div>
+                <LocationInput
+                  value={search.pickup}
+                  placeId={search.pickupPlaceId}
+                  placeholder="Enter pickup location"
+                  onChange={(value, placeId) => {
+                    setSearch((s) => ({ ...s, pickup: value, pickupPlaceId: placeId }));
+                  }}
+                />
+              </div>
+              <div>
+                <LocationInput
+                  value={search.drop}
+                  placeId={search.dropPlaceId}
+                  placeholder="Where are you going?"
+                  onChange={(value, placeId) => {
+                    setSearch((s) => ({ ...s, drop: value, dropPlaceId: placeId }));
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {routeReady && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '10px 0 14px', fontSize: '0.86rem', color: '#475569' }}>
+            <span>
+              {calculating ? 'Calculating distance…' : distanceError ? distanceError : distance !== null ? `📍 ${distance} km by road${search.tripType === 'ROUND_TRIP' ? ' (round trip included)' : ''}` : 'Fetching available cabs…'}
+            </span>
+            {distance !== null && <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Google Maps route</span>}
+          </div>
+        )}
+
+        {(() => {
+          const pNorm = (search.pickup || '').trim().toLowerCase();
+          const dNorm = (search.drop || '').trim().toLowerCase();
+          const matchedRoute = (routes || []).find(
+            (r) => r.active &&
+              (r.origin.toLowerCase() === pNorm || pNorm.includes(r.origin.toLowerCase())) &&
+              (r.destination.toLowerCase() === dNorm || dNorm.includes(r.destination.toLowerCase()))
+          );
+          if (!matchedRoute) return null;
+          const ratePerKm = Math.round(matchedRoute.fixedPrice / Math.max(1, matchedRoute.distance));
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#166534', fontWeight: 700, fontSize: '0.88rem' }}>
+                <Star size={16} fill="#16a34a" color="#16a34a" /> Popular Route Rate: {matchedRoute.origin} → {matchedRoute.destination}
+              </div>
+              <div style={{ fontWeight: 800, color: '#166534', fontSize: '1.05rem' }}>
+                {money(matchedRoute.fixedPrice)}
+              </div>
+            </div>
+          );
+        })()}
+
+        {routeReady && quotes.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Available Cabs
+            </div>
+            {quotes.map((v) => {
+              const isSelected = quote?.id === v.id;
+              return (
+                <div
+                  key={v.id}
+                  className={`ola-ride-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => setQuote(v)}
+                  role="button"
+                  tabIndex={0}
                 >
-                  + Add intermediate stop
-                </button>
-              )}
-            </div>
-          )}
-
-          {searchMode === 'route' && <div className="route-distance" role="status">
-            {calculating ? 'Calculating driving distance…' : distanceError || (distance !== null ? `${distance} km by road${search.tripType === 'ROUND_TRIP' ? ' · includes return journey' : ''}` : 'Select locations from the suggestions to calculate driving distance.')}
-            {distance !== null && <span className="google-attribution" translate="no">Google Maps</span>}
-          </div>}
-          <div className="booking-footnote">
-            <ShieldCheck size={14} /> Verified commercial chauffeurs • Sanitized air-conditioned fleet • 24/7 journey support
+                  <div className="ola-ride-left">
+                    <div className="ola-ride-thumb">
+                      {v.images && v.images.length > 0 ? (
+                        <img src={v.images[0]} alt={v.model} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <Car size={28} color="#475569" />
+                      )}
+                    </div>
+                    <div className="ola-ride-info">
+                      <h4>{v.model || v.type} <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>· {v.type}</span></h4>
+                      <p>
+                        <span><Users size={12} style={{ verticalAlign: 'middle', marginRight: 2 }} /> {v.capacity} seats</span>
+                        <span style={{ margin: '0 6px' }}>•</span>
+                        <span>{v.ac ? 'AC' : 'Non-AC'}</span>
+                        {v.rating ? (
+                          <>
+                            <span style={{ margin: '0 6px' }}>•</span>
+                            <span style={{ color: '#d97706', fontWeight: 600 }}>★ {v.rating.toFixed(1)}</span>
+                          </>
+                        ) : null}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="ola-ride-right">
+                    <div className="ola-ride-price">
+                      {money(v.fare ?? 0)}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                      {estimated ? 'Est. fare' : 'Fixed fare'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </form>
-      )}
+        )}
 
-      {step === 1 && (
-        <>
-          {pickupOnlyResults ? <p className="notice">Cars serving {search.pickup} on {search.date} at {search.time}. Fare is shown after you add a destination.</p> : <p className="notice">{distance} km by road{search.tripType === 'ROUND_TRIP' ? ' · includes return journey' : ''}</p>}
-          {(() => {
-            const pNorm = (search.pickup || '').trim().toLowerCase();
-            const dNorm = (search.drop || '').trim().toLowerCase();
-            const matchedRoute = (routes || []).find(
-              (r) => r.active &&
-                (r.origin.toLowerCase() === pNorm || pNorm.includes(r.origin.toLowerCase())) &&
-                (r.destination.toLowerCase() === dNorm || dNorm.includes(r.destination.toLowerCase()))
-            );
-            if (!matchedRoute) return null;
-            const ratePerKm = Math.round(matchedRoute.fixedPrice / Math.max(1, matchedRoute.distance));
-            return (
-              <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 16px', margin: '10px 0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-                <div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#166534', fontWeight: 700, fontSize: '0.92rem' }}>
-                    <Star size={16} fill="#16a34a" color="#16a34a" /> Popular Familiar Route: {matchedRoute.origin} → {matchedRoute.destination}
-                  </div>
-                  <div style={{ fontSize: '0.84rem', color: '#15803d', marginTop: 3 }}>
-                    Calculated at <strong>₹{ratePerKm}/km</strong> for {matchedRoute.distance} km = <strong>{money(matchedRoute.fixedPrice)}</strong> all-inclusive fixed fare for Sedan.
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#166534' }}>
-                    {money(matchedRoute.fixedPrice)}
-                  </div>
-                  <div style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 600 }}>
-                    ({matchedRoute.distance} km × ₹{ratePerKm}/km)
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-          <button className="text-button" onClick={() => setStep(0)}>
-            <ChevronLeft size={16} /> {pickupOnlyResults ? 'Edit pickup & time' : 'Edit trip route & time'}
-          </button>
-          {!pickupOnlyResults && <p className="muted">
-            {search.pickup} {search.stops.length > 0 ? `via ${search.stops.filter(Boolean).join(' → ')} ` : ''}→ {search.drop} · {search.date} at {search.time}
-          </p>}
-          <div className="grid-three">
-            {quotes.map((v) => (
-              <div
-                key={v.id}
-                className={`vehicle-card ${quote?.id === v.id ? 'selected' : ''}`}
-                style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', textAlign: 'left' }}
-              >
-                <div style={{ position: 'relative', height: 160, width: '100%', background: '#0f172a' }}>
-                  {v.images && v.images.length > 0 ? (
-                    <img
-                      src={v.images[0]}
-                      alt={v.model}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#94a3b8' }}>
-                      <Car size={56} strokeWidth={1.2} />
-                    </div>
-                  )}
-                  {v.images && v.images.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setGalleryModal(v);
-                        setActivePhotoIdx(0);
-                      }}
-                      style={{
-                        position: 'absolute',
-                        bottom: 8,
-                        right: 8,
-                        background: 'rgba(15,23,42,0.85)',
-                        color: '#fff',
-                        border: '1px solid rgba(255,255,255,0.3)',
-                        padding: '4px 10px',
-                        borderRadius: 14,
-                        fontSize: '0.74rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        backdropFilter: 'blur(4px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                      }}
-                    >
-                      <Camera size={13} /> {v.images.length} Photos
-                    </button>
-                  )}
-                </div>
-
-                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1 }}>
-                  <div className="section-title">
-                    <h3>{directBooking ? v.model : v.type}</h3>
-                    <Badge value="Available" />
-                  </div>
-                  <p className="muted">
-                    {directBooking ? `${v.type}${v.number ? ` · Reg: ${v.number}` : ''}` : `${v.model} or verified equivalent`}
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0 10px' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 700 }}>
-                      <Star size={13} fill="#f59e0b" color="#f59e0b" /> {(v.rating ?? 5.0).toFixed(1)}
-                    </span>
-                    <button
-                      type="button"
-                      style={{ background: 'none', border: 'none', color: '#1d5f59', cursor: 'pointer', fontSize: '0.82rem', textDecoration: 'underline', padding: 0, fontWeight: 600 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setReviewsModalVehicle(v);
-                      }}
-                    >
-                      {v.reviewCount ? `${v.reviewCount} verified ${v.reviewCount === 1 ? 'review' : 'reviews'}` : 'View reviews'}
-                    </button>
-                  </div>
-                  <div className="vehicle-features">
-                    <span><Users size={15} /> {v.capacity} passenger seats</span>
-                    <span><Wind size={15} /> {v.ac ? 'Climate Controlled AC' : 'Non-AC'}</span>
-                    <span><Luggage size={15} /> Luggage boot</span>
-                    {directBooking && v.driverName && (
-                      <div style={{ color: '#047857', fontWeight: 600, display: 'grid', gap: 3 }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={14} /> Chauffeur: {v.driverName}</span>
-                        <small style={{ color: '#64748b', fontWeight: 500 }}>★ {v.driverRating || 5} · {v.driverTrips || 0} completed trips{v.driverBaseLocation ? ` · Based in ${v.driverBaseLocation}` : ''}</small>
-                      </div>
-                    )}
-                  </div>
-                  {v.packages && v.packages.length > 0 && <div className="vehicle-packages">
-                    <p className="eyebrow">BOOKING PACKAGES</p>
-                    {v.packages.map((pkg) => <button key={pkg.id} type="button" className={`package-option ${packageSelections[v.id] === pkg.id ? 'selected' : ''}`} onClick={() => setPackageSelections({ ...packageSelections, [v.id]: pkg.id })}>
-                      <strong>{pkg.name}</strong><span>{pkg.includedHours} hr · {pkg.includedKm} km</span><b>{money(pkg.estimatedFare ?? pkg.price)}</b>
-                      <small>Extra km {money(pkg.extraKmRate)}/km · extra hour {money(pkg.extraHourRate)}/hr{pkg.tollsParkingExtra ? ' · tolls & parking extra' : ''}</small>
-                    </button>)}
-                  </div>}
-                  <div className="section-title" style={{ marginTop: 'auto', paddingTop: 12 }}>
-                    <button
-                      type="button"
-                      className="primary small"
-                      style={{ width: '100%', justifyContent: 'center' }}
-                      disabled={!pickupOnlyResults && Boolean(v.packages?.length) && !packageSelections[v.id]}
-                      onClick={() => {
-                        if (pickupOnlyResults) {
-                          setPreferredVehicleId(v.id);
-                          setSelectedPackageId(packageSelections[v.id] || v.packages?.[0]?.id || '');
-                          setSearch((current) => ({ ...current, drop: '', dropPlaceId: '', tripType: 'ONE_WAY', stops: [], stopPlaceIds: [] }));
-                          setSearchMode('route');
-                          setPickupOnlyResults(false);
-                          setQuotes([]);
-                          setStep(0);
-                        } else {
-                          setQuote(v);
-                          setSelectedPackageId(packageSelections[v.id] || '');
-                          setExtraHours(0);
-                          setStep(2);
-                        }
-                      }}
-                    >
-                      {pickupOnlyResults ? 'Use this car' : v.packages?.length && !packageSelections[v.id] ? 'Choose a package' : 'Select ride'} <ArrowRight size={16} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {routeReady && quotes.length === 0 && !busy && !calculating && (
+          <div style={{ padding: '24px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: 12, marginTop: 12 }}>
+            <Car size={32} color="#94a3b8" style={{ marginBottom: 8 }} />
+            <p style={{ fontWeight: 600, color: '#1e293b', margin: '0 0 4px' }}>No vehicles currently available</p>
+            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Try choosing a different time or contact dispatch for assistance.</p>
           </div>
-          {quotes.length === 0 && (
-            <Empty title="No vehicles available for the requested time.">
-              <p>No available driver is based within their service radius of this pickup. Try another pickup location or date, or contact dispatch.</p>
-              <button className="primary" onClick={() => setStep(0)}>
-                Change search
-              </button>
-            </Empty>
-          )}
+        )}
 
-          {galleryModal && (
-            <Modal title={`${galleryModal.model} (${galleryModal.images?.length || 0} Photos)`} onClose={() => setGalleryModal(null)}>
-              <div style={{ textAlign: 'center' }}>
-                {galleryModal.images && galleryModal.images.length > 0 && (
-                  <>
-                    <div style={{ height: 320, width: '100%', background: '#0f172a', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
-                      <img
-                        src={galleryModal.images[activePhotoIdx]}
-                        alt={`Vehicle photo ${activePhotoIdx + 1}`}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', overflowX: 'auto', paddingBottom: 8 }}>
-                      {galleryModal.images.map((img, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setActivePhotoIdx(i)}
-                          style={{
-                            padding: 0,
-                            border: i === activePhotoIdx ? '2px solid #2563eb' : '2px solid transparent',
-                            borderRadius: 6,
-                            overflow: 'hidden',
-                            cursor: 'pointer',
-                            width: 64,
-                            height: 48,
-                            background: '#0f172a',
-                            flexShrink: 0,
-                          }}
-                        >
-                          <img src={img} alt={`Thumb ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="muted" style={{ fontSize: '0.86rem' }}>
-                        Photo {activePhotoIdx + 1} of {galleryModal.images.length}
-                      </span>
-                      <button
-                        type="button"
-                        className="primary"
-                        onClick={() => {
-                          setQuote(galleryModal);
-                          setGalleryModal(null);
-                          setStep(2);
-                        }}
-                      >
-                        Select this Vehicle <ArrowRight size={16} />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </Modal>
-          )}
+        {(busy || calculating) && routeReady && quotes.length === 0 && (
+          <div style={{ padding: '20px 16px', textAlign: 'center', color: '#64748b', fontSize: 14 }}>
+            Finding nearby available cabs…
+          </div>
+        )}
 
-          {reviewsModalVehicle && (
-            <VehicleReviewsModal vehicle={reviewsModalVehicle} onClose={() => setReviewsModalVehicle(null)} />
-          )}
-        </>
-      )}
-
-      {step === 2 && quote && (
-        <form onSubmit={book}>
-          {(() => {
-            const pkg = quote.packages?.find((item) => item.id === selectedPackageId);
-            return pkg ? <div className="package-booking-summary">
-              <strong>{pkg.name}: {pkg.includedHours} hours · {pkg.includedKm} km</strong>
-              <span>Package {money(pkg.estimatedFare ?? pkg.price)}{distance && distance > pkg.includedKm ? ` · ${distance - pkg.includedKm} extra km` : ''}</span>
-              <span>Extra km {money(pkg.extraKmRate)}/km · extra hour {money(pkg.extraHourRate)}/hour · tolls and parking extra</span>
-              <label>Additional hours requested (optional)<input type="number" min={0} max={48} value={extraHours} onChange={(e) => setExtraHours(Number(e.target.value))} /></label>
-              <strong>Estimated total: {money((pkg.estimatedFare ?? pkg.price) + extraHours * pkg.extraHourRate)}</strong>
-            </div> : null;
-          })()}
-          <button type="button" className="text-button" onClick={() => setStep(1)}>
-            <ChevronLeft size={16} /> Choose a different vehicle
-          </button>
-          <div className="booking-details-grid">
-            <div className="form-grid">
-              <label>
-                Full Name
-                <input required minLength={2} value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} />
-              </label>
-              <label>
-                Contact Phone Number
-                <input required pattern="[6-9][0-9]{9}" type="tel" value={details.phone} onChange={(e) => setDetails({ ...details, phone: e.target.value })} />
-              </label>
-              <label>
-                Email Address (verification code & trip updates)
-                <input required type="email" readOnly={Boolean(token && verifiedEmail && verifiedEmail === details.email.trim().toLowerCase())} value={details.email} onChange={(e) => setDetails({ ...details, email: e.target.value })} />
-              </label>
-              <label>
-                Passenger Count
-                <input required type="number" min={1} max={quote.capacity} value={details.passengers} onChange={(e) => setDetails({ ...details, passengers: Number(e.target.value) })} />
-              </label>
-              <label>
-                Luggage Pieces
-                <input required type="number" min={0} max={20} value={details.luggage} onChange={(e) => setDetails({ ...details, luggage: Number(e.target.value) })} />
-              </label>
-              <label>
-                Special Pickup Requests (optional)
-                <textarea maxLength={500} value={details.requests} onChange={(e) => setDetails({ ...details, requests: e.target.value })} placeholder="Flight/Train number, terminal pickup, child seat…" />
-              </label>
-            </div>
-            <aside className="fare-summary">
-              <p className="eyebrow">TRIP SUMMARY</p>
-              <h3>
-                {search.pickup} {search.stops.length > 0 ? `via ${search.stops.filter(Boolean).join(', ')} ` : ''}→ {search.drop}
+        {quote && (
+          <form onSubmit={book} className="ola-confirm-box">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                Rider Details
               </h3>
-              <p>{search.date} · {search.time}</p>
-              {distance && <p>{distance} km by road {search.tripType === 'ROUND_TRIP' ? '· includes return journey' : ''}</p>}
-              {(() => {
-                const pNorm = (search.pickup || '').trim().toLowerCase();
-                const dNorm = (search.drop || '').trim().toLowerCase();
-                const matchedRoute = (routes || []).find(
-                  (r) => r.active &&
-                    (r.origin.toLowerCase() === pNorm || pNorm.includes(r.origin.toLowerCase())) &&
-                    (r.destination.toLowerCase() === dNorm || dNorm.includes(r.destination.toLowerCase()))
-                );
-                if (!matchedRoute) return null;
-                const ratePerKm = Math.round(matchedRoute.fixedPrice / Math.max(1, matchedRoute.distance));
-                return (
-                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 12px', margin: '8px 0', fontSize: '0.84rem', color: '#166534' }}>
-                    ✓ <strong>Familiar Route Rate:</strong> {matchedRoute.distance} km × ₹{ratePerKm}/km = <strong>{money(matchedRoute.fixedPrice)}</strong>
-                  </div>
-                );
-              })()}
-              <p>{directBooking ? `${quote.model}${quote.number ? ` (${quote.number})` : ''} · ${quote.type}` : `${quote.type} (${quote.model})`} · {details.passengers} passenger(s)</p>
-              <hr />
-              <p className="notice">Instant reservation confirmation. Chauffeur and vehicle details will be dispatched prior to pickup.</p>
-              <button className="primary full" disabled={busy}>
-                {busy ? 'Securing reservation…' : 'Confirm Booking'} <ArrowRight size={17} />
-              </button>
-            </aside>
-          </div>
-        </form>
-      )}
+              <span style={{ fontSize: 12, background: '#ecfdf5', color: '#047857', padding: '3px 8px', borderRadius: 12, fontWeight: 600 }}>
+                ✓ Pay Driver After Trip
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
+                  Your Name
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Rahul Sharma"
+                  value={details.name}
+                  onChange={(e) => setDetails({ ...details, name: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
+                  Mobile Number (10 digits)
+                </label>
+                <input
+                  required
+                  type="tel"
+                  pattern="[6-9][0-9]{9}"
+                  maxLength={10}
+                  placeholder="e.g. 9876543210"
+                  value={details.phone}
+                  onChange={(e) => setDetails({ ...details, phone: e.target.value.replace(/\D/g, '') })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
+                />
+              </div>
+            </div>
+
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>💵</span>
+                <div>
+                  <strong style={{ color: '#0f172a' }}>Cash or UPI to Driver</strong>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Pay via Google Pay / PhonePe / Cash when trip completes</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: '#0f172a' }}>
+                  {money(quote.fare ?? 0)}
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>Total Fare</div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="primary full"
+              disabled={busy || !details.name.trim() || details.phone.replace(/\D/g, '').length !== 10}
+              style={{
+                width: '100%',
+                padding: '14px',
+                fontSize: 16,
+                fontWeight: 700,
+                borderRadius: 10,
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              {busy ? 'Booking ride…' : `Confirm & Book ${quote.model || quote.type}`} <ArrowRight size={18} />
+            </button>
+
+            <div style={{ textAlign: 'center', marginTop: 10, fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <ShieldCheck size={14} color="#16a34a" /> Free cancellation • Professional drivers • Sanitized AC cabs
+            </div>
+          </form>
+        )}
+      </div>
 
       {otpModal && (
         <Modal title="Verify email & confirm booking" onClose={() => setOtpModal(false)}>
